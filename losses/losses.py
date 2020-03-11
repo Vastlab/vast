@@ -1,5 +1,12 @@
 import torch
 
+'''
+use "update_centers(.)" after optimizer.step() in dataloader loop
+
+'''
+
+
+
 class center_loss:
     def __init__(self, alpha=0.1, classes=range(10), fc_layer_dimension=2):
         """
