@@ -15,20 +15,20 @@ class center_loss:
                             ))
         self.euclidean_dist_obj = torch.nn.PairwiseDistance(p=2)
 
-    def update_centers(self, fc_outputs, targets):
+    def update_centers(self, fc_outputs, true_label):
         # find all samples of knowns
-        for cls_no in set(targets[targets >= 0].tolist()):
+        for cls_no in set(true_label[true_label >= 0].tolist()):
             # Equation (4) from the paper
-            delta_c = fc_outputs[targets == cls_no].cpu().detach() - self.centers[cls_no]
-            delta_c = torch.sum(delta_c, dim=0) / fc_outputs[targets == cls_no].shape[0]
+            delta_c = fc_outputs[true_label == cls_no].cpu().detach() - self.centers[cls_no]
+            delta_c = torch.sum(delta_c, dim=0) / fc_outputs[true_label == cls_no].shape[0]
             # Step 6 from Algorithm 1
             self.centers[cls_no] = self.centers[cls_no] + (self.alpha * delta_c)
 
-    def compute_loss(self, fc, targets):
+    def compute_loss(self, fc, true_label):
         # Equation (2) from paper
         loss = torch.zeros(fc.shape[0]).to(fc.device)
-        for cls_no in set(targets.tolist()):
-            loss[targets == cls_no] = self.euclidean_dist_obj(fc[targets == cls_no],
-                                                              self.centers[cls_no].expand_as(fc[targets == cls_no]).to(
+        for cls_no in set(true_label.tolist()):
+            loss[true_label == cls_no] = self.euclidean_dist_obj(fc[true_label == cls_no],
+                                                              self.centers[cls_no].expand_as(fc[true_label == cls_no]).to(
                                                                   fc.device))
         return torch.mean(loss)
