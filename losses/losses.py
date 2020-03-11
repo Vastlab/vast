@@ -15,12 +15,12 @@ class center_loss:
                             ))
         self.euclidean_dist_obj = torch.nn.PairwiseDistance(p=2)
 
-    def update_centers(self, fc_outputs, true_label):
+    def update_centers(self, fc, true_label):
         # find all samples of knowns
         for cls_no in set(true_label[true_label >= 0].tolist()):
             # Equation (4) from the paper
-            delta_c = fc_outputs[true_label == cls_no].cpu().detach() - self.centers[cls_no]
-            delta_c = torch.sum(delta_c, dim=0) / fc_outputs[true_label == cls_no].shape[0]
+            delta_c = fc[true_label == cls_no].cpu().detach() - self.centers[cls_no]
+            delta_c = torch.sum(delta_c, dim=0) / fc[true_label == cls_no].shape[0]
             # Step 6 from Algorithm 1
             self.centers[cls_no] = self.centers[cls_no] + (self.alpha * delta_c)
 
