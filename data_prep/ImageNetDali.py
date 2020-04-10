@@ -9,7 +9,7 @@ import nvidia.dali.types as nvidia_types
 # Don't need to inherit from 'object' in Python3 onwards
 # Only needed for backward compatibility: https://stackoverflow.com/questions/4015417/python-class-inherits-object
 class ExternalInputIterator():
-    def __init__(self, batch_size, device_id, num_gpus, csv_file):
+    def __init__(self, batch_size, device_id, num_gpus, csv_file, images_path):
         self.batch_size = batch_size
         with open(csv_file, 'r') as f:
             self.files = [line.rstrip() for line in f if line is not '']
@@ -20,6 +20,7 @@ class ExternalInputIterator():
         self.files = self.files[
                      self.data_set_len * device_id // num_gpus: self.data_set_len * (device_id + 1) // num_gpus]
         self.n = len(self.files)
+        self.images_path = images_path
 
     def __iter__(self):
         self.i = 0
@@ -31,12 +32,22 @@ class ExternalInputIterator():
         batch_labels = []
         if self.i >= self.n:
             raise StopIteration
-        for _ in range(self.batch_size):
+#        for _ in range(self.batch_size):
+        while len(batch_inputs)<self.batch_size and self.i<self.n:
             jpeg_path, label = self.files[self.i].split(',')
-            f = open(jpeg_path, 'rb')
+            f = open(self.images_path+jpeg_path, 'rb')
             batch_inputs.append(np.frombuffer(f.read(), dtype=np.uint8))
             batch_labels.append(np.array([label], dtype=np.uint8))
-            self.i = (self.i + 1) % self.n
+            self.i += 1
+#            self.i = (self.i + 1) % self.n
+        if self.i==self.n:
+            counter = 0
+            while len(batch_inputs) < self.batch_size:
+                jpeg_path, label = self.files[counter].split(',')
+                f = open(self.images_path + jpeg_path, 'rb')
+                batch_inputs.append(np.frombuffer(f.read(), dtype=np.uint8))
+                batch_labels.append(np.array([label], dtype=np.uint8))
+                counter+=1
         return (batch_inputs, batch_labels)
 
     @property
@@ -46,7 +57,7 @@ class ExternalInputIterator():
 
 class ExternalSourcePipeline(Pipeline):
     def __init__(self, batch_size, num_threads, device_id, external_data):
-        super(ExternalSourcePipeline, self).__init__(batch_size, num_threads, device_id, seed=34)
+        super(ExternalSourcePipeline, self).__init__(batch_size, num_threads, device_id, seed=34,prefetch_queue_depth={ "cpu_size": 10, "gpu_size": 2})
         self.input = nvidia_ops.ExternalSource()
         self.input_label = nvidia_ops.ExternalSource()
         self.decode = nvidia_ops.ImageDecoder(device="mixed", output_type=nvidia_types.RGB)
