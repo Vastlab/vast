@@ -43,7 +43,7 @@ def process_each_file(file_name):
 
 all_images_to_process = list(org_dataset_path.glob("*/*"))
 print (f"Processing {len(all_images_to_process)} images")
-p = Pool(int(multiprocessing.cpu_count()*10))
+p = Pool(multiprocessing.cpu_count())
 it = p.imap(process_each_file,all_images_to_process)
 images_with_src_smaller_than_dest=0
 with tqdm(total=len(all_images_to_process)) as progress_bar:
