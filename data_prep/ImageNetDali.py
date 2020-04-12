@@ -59,24 +59,27 @@ class ExternalInputIterator():
     next = __next__
 
 class ExternalSourcePipeline(Pipeline):
-    def __init__(self, batch_size, num_threads, device_id, external_data, device_type="gpu"):
+    def __init__(self, batch_size, num_threads, device_id, external_data, device_type="gpu",resize=True):
         super(ExternalSourcePipeline, self).__init__(batch_size, num_threads, device_id, seed=34,prefetch_queue_depth={ "cpu_size": 10, "gpu_size": 2})
         self.input = nvidia_ops.ExternalSource()
         self.input_label = nvidia_ops.ExternalSource()
         self.decode = nvidia_ops.ImageDecoder(device="mixed" if device_type=="gpu" else "cpu", output_type=nvidia_types.RGB)
-        self.res = nvidia_ops.Resize(device=device_type, resize_x=224, resize_y=224)
+        if resize:
+            self.res = nvidia_ops.Resize(device=device_type, resize_x=224, resize_y=224)
         self.transpose = nvidia_ops.Transpose(device=device_type,perm=(2,0,1))
         self.cast = nvidia_ops.Cast(device="gpu", dtype=nvidia_types.FLOAT)
         self.cast2 = nvidia_ops.Cast(device="cpu", dtype=nvidia_types.FLOAT)
         self.external_data = external_data
         self.iterator = iter(self.external_data)
         self.device_type = device_type
+        self.resize = resize
 
     def define_graph(self):
         self.jpegs = self.input()
         self.labels = self.input_label()
         images = self.decode(self.jpegs)
-        images = self.res(images)
+        if self.resize:
+            images = self.res(images)
         images = self.transpose(images)
         if self.device_type!="gpu":
             images = images.gpu()
