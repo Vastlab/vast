@@ -59,33 +59,50 @@ class ExternalInputIterator():
     next = __next__
 
 class ExternalSourcePipeline(Pipeline):
-    def __init__(self, batch_size, num_threads, device_id, external_data, device_type="gpu",resize=True):
-        super(ExternalSourcePipeline, self).__init__(batch_size, num_threads, device_id, seed=34,prefetch_queue_depth={ "cpu_size": 10, "gpu_size": 2})
+    def __init__(self, batch_size, num_threads, device_id, external_data, device_type="gpu", training=False):
+        super(ExternalSourcePipeline, self).__init__(batch_size, num_threads, device_id, seed=34,prefetch_queue_depth={ "cpu_size": 15, "gpu_size": 3})
         self.input = nvidia_ops.ExternalSource()
         self.input_label = nvidia_ops.ExternalSource()
         self.decode = nvidia_ops.ImageDecoder(device="mixed" if device_type=="gpu" else "cpu", output_type=nvidia_types.RGB)
-        if resize:
-            self.res = nvidia_ops.Resize(device=device_type, resize_x=224, resize_y=224)
-        self.transpose = nvidia_ops.Transpose(device=device_type,perm=(2,0,1))
+        self.training = training
+        self.crop_loc = nvidia_ops.Uniform(range=(0.,1.))
+        self.coin = nvidia_ops.CoinFlip(probability=0.5)
+        self.resize = nvidia_ops.Resize(device=device_type, resize_shorter=256)
+        self.crop_mirror_normalize = nvidia_ops.CropMirrorNormalize(device=device_type, crop=(224,224),mean=128,std=1,output_layout='HWC')
+        self.jitter = nvidia_ops.Jitter(device="gpu", nDegree=2)
+        self.transpose = nvidia_ops.Transpose(device="gpu",perm=(2,0,1))
         self.cast = nvidia_ops.Cast(device="gpu", dtype=nvidia_types.FLOAT)
-        self.cast2 = nvidia_ops.Cast(device="cpu", dtype=nvidia_types.FLOAT)
         self.external_data = external_data
         self.iterator = iter(self.external_data)
         self.device_type = device_type
-        self.resize = resize
+
+    def training_data_augmentation(self, images):
+        images = self.crop_mirror_normalize(images, crop_pos_x=self.crop_loc(), crop_pos_y=self.crop_loc(),
+                                            mirror=self.coin())
+        if self.device_type!="gpu":
+            images = images.gpu()
+        # Does not work https://github.com/NVIDIA/DALI/issues/966
+        # images = self.jitter(images)
+        return images
+
+    def validation_data_augmentation(self, images):
+        images = self.crop_mirror_normalize(images)
+        if self.device_type!="gpu":
+            images = images.gpu()
+        return images
 
     def define_graph(self):
         self.jpegs = self.input()
         self.labels = self.input_label()
         images = self.decode(self.jpegs)
-        if self.resize:
-            images = self.res(images)
+        images = self.resize(images)
+        if self.training:
+            images = self.training_data_augmentation(images)
+        else:
+            images = self.validation_data_augmentation(images)
         images = self.transpose(images)
-        if self.device_type!="gpu":
-            images = images.gpu()
-        output = (self.cast(images) / 128) - 1
-        self.labels_output = self.cast2(self.labels)
-        return (output, self.labels_output)
+        output = self.cast(images)
+        return (output, self.labels)
 
     def iter_setup(self):
         try:
