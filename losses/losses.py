@@ -1,17 +1,15 @@
 import torch
 from torch.nn import functional as F
 
-'''
-use "update_centers(.)" after optimizer.step() in dataloader loop
-
-'''
-
+"""
+For usage consult https://github.com/Vastlab/MNIST_Experiments/blob/master/MNIST_SoftMax_Training.py
+"""
 
 class center_loss:
-    def __init__(self, beta=0.1, classes=range(300), fc_layer_dimension=2048):
+    def __init__(self, beta=0.1, classes=range(10), fc_layer_dimension=2):
         """
         This class implements center loss introduced in https://ydwen.github.io/papers/WenECCV16.pdf
-        :param beta:  The factor by which learning rate should be updated
+        :param beta:  The factor by which centers should be updated
         :param classes: A list containing class labels for which we will be computing center loss \
                         Note-> This list should only contain positive numbers, negatives are reserved for unknowns
         :param fc_layer_dimension: The dimension of the layer in which center loss is being computed
@@ -29,12 +27,41 @@ class center_loss:
             # Step 6 from Algorithm 1
             self.centers[cls_no] = self.centers[cls_no] + (self.beta * delta_c)
 
-    def compute_loss(self, FV, true_label):
+    def __call__(self, FV, true_label):
         # Equation (2) from paper
         loss = torch.zeros(FV.shape[0]).to(FV.device)
         for cls_no in set(true_label.tolist()):
             loss[true_label == cls_no] = self.euclidean_dist_obj(FV[true_label == cls_no],
                                                                  self.centers[cls_no].expand_as(FV[true_label == cls_no]).to(FV.device))
+        return torch.mean(loss)
+
+
+class tensor_center_loss:
+    def __init__(self, beta=0.1, classes=range(10), fc_layer_dimension=2, initial_value=None):
+        """
+        This class implements center loss introduced in https://ydwen.github.io/papers/WenECCV16.pdf
+        :param beta:  The factor by which centers should be updated
+        :param classes: A list containing class labels for which we will be computing center loss \
+                        Note-> This list should only contain positive numbers, negatives are reserved for unknowns
+        :param fc_layer_dimension: The dimension of the layer in which center loss is being computed
+        """
+        self.beta = beta
+        self.euclidean_dist_obj = torch.nn.PairwiseDistance(p=2)
+        self.centers = torch.zeros((len(classes), fc_layer_dimension)).requires_grad_(requires_grad=False).cuda()
+        if initial_value is not None:
+            for cls_no in classes:
+                self.centers[cls_no] = torch.tensor(initial_value[cls_no])
+
+    def update_centers(self, FV, true_label):
+        FV = FV.detach()
+        deltas = FV - self.centers[true_label,:].requires_grad_(requires_grad=False)
+        for cls_no in set(true_label.tolist()):
+#            print(self.centers[cls_no].shape,deltas[true_label==cls_no].shape,torch.mean(self.beta * deltas[true_label==cls_no],dim=0).shape)
+            self.centers[cls_no] += (self.beta * torch.mean(deltas[true_label==cls_no],dim=0))
+
+    def __call__(self, FV, true_label):
+        # Equation (2) from paper
+        loss = self.euclidean_dist_obj(FV,self.centers[true_label,:].to(FV.device))
         return torch.mean(loss)
 
 
@@ -66,7 +93,7 @@ class objecto_center_loss:
             self.centers[cls_no] = self.centers[cls_no] + (self.alpha * delta_c)
             self.centers[cls_no] = self.ring_size*(self.centers[cls_no]/torch.norm(self.centers[cls_no], p=2, dim=-1))
 
-    def compute_loss(self, fc, true_label):
+    def __call__(self, fc, true_label):
         # Equation (2) from paper
         loss = torch.zeros(fc.shape[0]).to(fc.device)
         for cls_no in set(true_label.tolist()):
@@ -110,4 +137,12 @@ def nll_loss(logit_values, target):
     negative_log_values = -1 * log_values
     loss = negative_log_values * target
     sample_loss = torch.mean(loss, dim=1)
+    return sample_loss
+
+def org_sigmoid(logit_values, target, sample_weights):
+    """
+    Reimplementation of original sigmoid loss
+    """
+    loss = torch._C._nn.binary_cross_entropy(torch.sigmoid(logit_values), target)
+    loss = torch.mean(loss*sample_weights,dim=1)
     return torch.mean(loss)
