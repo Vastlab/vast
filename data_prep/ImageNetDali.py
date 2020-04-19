@@ -60,7 +60,7 @@ class ExternalInputIterator():
         if self.i==self.n:
             counter = 0
             while len(batch_inputs) < self.batch_size:
-                jpeg_path, label = self.files[counter].split(',')
+                jpeg_path, label = self.files[counter]
                 f = open(self.images_path + jpeg_path, 'rb')
                 batch_inputs.append(np.frombuffer(f.read(), dtype=np.uint8))
                 batch_labels.append(np.array([label], dtype=np.uint8))
