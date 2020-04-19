@@ -20,7 +20,7 @@ class ExternalInputIterator():
                 with open(filename, 'r') as f:
                     files = list(csv.reader(f))
             elif filename.suffix == '.json':
-                files = SAILON.get_files_labels(filename)
+                files = get_files_labels(filename)
             if file_no == 1:
                 names,labels = zip(*files)
                 files = list(zip(names,[unknowns_label]*len(names)))
