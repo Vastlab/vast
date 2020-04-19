@@ -103,14 +103,13 @@ class objecto_center_loss:
         return torch.mean(loss)
 
 class entropic_openset_loss():
-    def __init__(self, num_of_classes=10, sample_weights=None):
+    def __init__(self, num_of_classes=10):
         self.num_of_classes = num_of_classes
-        self.sample_weights = sample_weights
         self.eye = torch.eye(self.num_of_classes).cuda()
         self.ones = torch.ones(self.num_of_classes).cuda()
         self.unknowns_multiplier = 1. / self.num_of_classes
 
-    def __call__(self, logit_values, target):
+    def __call__(self, logit_values, target, sample_weights=None):
         catagorical_targets = torch.zeros(logit_values.shape).cuda()
         known_indexes = target != -1
         unknown_indexes = target == -1
@@ -120,24 +119,36 @@ class entropic_openset_loss():
         negative_log_values = -1 * log_values
         loss = negative_log_values * catagorical_targets
         sample_loss = torch.mean(loss, dim=1)
-        if self.sample_weights is not None:
-            sample_loss = sample_loss * self.sample_weights
+        if sample_weights is not None:
+            sample_loss = sample_loss * sample_weights
         return sample_loss
 
 
-def objectoSphere_loss(features, target, knownsMinimumMag=50., sample_weights=None):
-    knownsMinimumMag_tensor = torch.ones((features.shape[0])) * knownsMinimumMag
-    knownsMinimumMag_tensor = knownsMinimumMag_tensor.to(features.device)
-    mag = features.norm(p=2, dim=1)
-    # For knowns magnitude minus \beta is loss
-    mag_diff_from_ring = torch.clamp(knownsMinimumMag_tensor - mag, min=0.)
-    loss = torch.zeros((features.shape[0])).to(features.device)
-    loss[target != -1] = mag_diff_from_ring[target != -1]
-    loss[target == -1] = mag[target == -1]
-    loss = torch.pow(loss, 2)
-    if sample_weights is not None:
-        loss = sample_weights * loss
-    return loss
+class objectoSphere_loss():
+    def __init__(self, batch_size, knownsMinimumMag=50.):
+        self.knownsMinimumMag = knownsMinimumMag
+        self.knownsMinimumMag_tensor = torch.ones(batch_size).cuda() * self.knownsMinimumMag
+        self.zeros = torch.zeros(batch_size).cuda()
+        self.batch_size = batch_size
+
+    def __call__(self, features, target, sample_weights=None):
+        features_ = features.detach()
+        mag = features_.norm(p=2, dim=1)
+        if features.shape[0]!=self.batch_size:
+            self.knownsMinimumMag_tensor = torch.ones(features.shape[0]).cuda() * self.knownsMinimumMag
+            self.zeros = torch.zeros(features.shape[0]).cuda()
+            self.batch_size = features.shape[0]
+        # For knowns magnitude minus \beta is loss
+        mag_diff_from_ring = torch.clamp(self.knownsMinimumMag_tensor - mag, min=0.)
+        loss = self.zeros
+        known_indexes = target != -1
+        unknown_indexes = target == -1
+        loss[known_indexes] = mag_diff_from_ring[known_indexes]
+        loss[unknown_indexes] = mag[unknown_indexes]
+        loss = torch.pow(loss, 2)
+        if sample_weights is not None:
+            loss = sample_weights * loss
+        return loss
 
 
 def nll_loss(logit_values, target):
