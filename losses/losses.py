@@ -102,19 +102,27 @@ class objecto_center_loss:
                                                                   fc.device))
         return torch.mean(loss)
 
-def entropic_openset_loss(logit_values, target, num_of_classes=10, sample_weights=None):
-    catagorical_targets = torch.zeros(logit_values.shape)
-    catagorical_targets[target != -1, :] = torch.eye(num_of_classes)[target[target != -1]]
-    catagorical_targets[target == -1, :] = torch.ones(target[target == -1].shape[0], num_of_classes) * (
-            1. / num_of_classes)
-    catagorical_targets = catagorical_targets.to(logit_values.device)
-    log_values = F.log_softmax(logit_values, dim=1)
-    negative_log_values = -1 * log_values
-    loss = negative_log_values * catagorical_targets
-    sample_loss = torch.mean(loss, dim=1)
-    if sample_weights is not None:
-        sample_loss = sample_loss * sample_weights
-    return sample_loss
+class entropic_openset_loss():
+    def __init__(self, num_of_classes=10, sample_weights=None):
+        self.num_of_classes = num_of_classes
+        self.sample_weights = sample_weights
+        self.eye = torch.eye(self.num_of_classes).cuda()
+        self.ones = torch.ones(self.num_of_classes).cuda()
+        self.unknowns_multiplier = 1. / self.num_of_classes
+
+    def __call__(self, logit_values, target):
+        catagorical_targets = torch.zeros(logit_values.shape).cuda()
+        known_indexes = target != -1
+        unknown_indexes = target == -1
+        catagorical_targets[known_indexes, :] = self.eye[target[known_indexes]]
+        catagorical_targets[unknown_indexes, :] = self.ones.expand((target[unknown_indexes].shape[0],self.num_of_classes)) * self.unknowns_multiplier
+        log_values = F.log_softmax(logit_values, dim=1)
+        negative_log_values = -1 * log_values
+        loss = negative_log_values * catagorical_targets
+        sample_loss = torch.mean(loss, dim=1)
+        if self.sample_weights is not None:
+            sample_loss = sample_loss * self.sample_weights
+        return sample_loss
 
 
 def objectoSphere_loss(features, target, knownsMinimumMag=50., sample_weights=None):
