@@ -73,7 +73,8 @@ class ExternalInputIterator():
     next = __next__
 
 class ExternalSourcePipeline(Pipeline):
-    def __init__(self, batch_size, num_threads, device_id, external_data, device_type="gpu", training=False):
+    def __init__(self, batch_size, num_threads, device_id, external_data, device_type="gpu",
+                 training=False, image_size=224):
         super(ExternalSourcePipeline, self).__init__(batch_size, num_threads, device_id, seed=34,prefetch_queue_depth={ "cpu_size": 10, "gpu_size": 2})
         self.input = nvidia_ops.ExternalSource()
         self.input_label = nvidia_ops.ExternalSource()
@@ -83,8 +84,9 @@ class ExternalSourcePipeline(Pipeline):
         self.rotation_angle = nvidia_ops.Uniform(range=(0.,10.))
         self.decode = nvidia_ops.ImageDecoder(device="mixed" if device_type=="gpu" else "cpu", output_type=nvidia_types.RGB)
         self.rotate = nvidia_ops.Rotate(device=device_type)
-        self.resize = nvidia_ops.Resize(device=device_type, resize_shorter=256)
-        self.crop_mirror_normalize = nvidia_ops.CropMirrorNormalize(device=device_type, crop=(224,224),mean=128,std=128,output_layout='HWC')
+        self.resize = nvidia_ops.Resize(device=device_type, resize_shorter=(image_size*256/224))
+        self.crop_mirror_normalize = nvidia_ops.CropMirrorNormalize(device=device_type, crop=(image_size,image_size),
+                                                                    mean=128,std=128,output_layout='HWC')
         self.jitter = nvidia_ops.Jitter(device="gpu", nDegree=4)
         self.transpose = nvidia_ops.Transpose(device="gpu",perm=(2,0,1))
         self.cast = nvidia_ops.Cast(device="gpu", dtype=nvidia_types.FLOAT)
