@@ -49,22 +49,14 @@ class ExternalInputIterator():
     def __next__(self):
         batch_inputs = []
         batch_labels = []
-        if self.i >= self.n:
-            raise StopIteration
         while len(batch_inputs)<self.batch_size and self.i<self.n:
             jpeg_path, label = self.files[self.i]
             f = open(self.images_path+jpeg_path, 'rb')
             batch_inputs.append(np.frombuffer(f.read(), dtype=np.uint8))
-            batch_labels.append(np.array([label], dtype=np.uint8))
+            batch_labels.append(np.array([label], dtype=np.int32))
             self.i += 1
-        if self.i==self.n:
-            counter = 0
-            while len(batch_inputs) < self.batch_size:
-                jpeg_path, label = self.files[counter]
-                f = open(self.images_path + jpeg_path, 'rb')
-                batch_inputs.append(np.frombuffer(f.read(), dtype=np.uint8))
-                batch_labels.append(np.array([label], dtype=np.uint8))
-                counter+=1
+        if self.i >= self.n:
+            raise StopIteration
         return (batch_inputs, batch_labels)
 
     @property
