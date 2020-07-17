@@ -1,5 +1,4 @@
 import csv
-from .SAILON import *
 import numpy as np
 import random
 random.seed(0)
@@ -19,8 +18,6 @@ class ExternalInputIterator():
             if filename.suffix == '.csv':
                 with open(filename, 'r') as f:
                     files = list(csv.reader(f))
-            elif filename.suffix == '.json':
-                files = get_files_labels(filename)
             if file_no == 1:
                 names,labels = zip(*files)
                 files = list(zip(names,[unknowns_label]*len(names)))
@@ -94,7 +91,7 @@ class ExternalSourcePipeline(Pipeline):
         if self.device_type!="gpu":
             images = images.gpu()
         # Does not work https://github.com/NVIDIA/DALI/issues/966
-        # images = self.jitter(images)
+        images = self.jitter(images)
         return images
 
     def validation_data_augmentation(self, images):
