@@ -70,7 +70,7 @@ class ExternalSourcePipeline(Pipeline):
         self.training = training
         self.crop_loc = nvidia_ops.Uniform(range=(0.,1.))
         self.coin = nvidia_ops.CoinFlip(probability=0.5)
-        self.rotation_angle = nvidia_ops.Uniform(range=(0.,10.))
+        self.rotation_angle = nvidia_ops.Uniform(range=(-45.,45.))
         self.decode = nvidia_ops.ImageDecoder(device="mixed" if device_type=="gpu" else "cpu", output_type=nvidia_types.RGB)
         self.rotate = nvidia_ops.Rotate(device=device_type)
         self.resize = nvidia_ops.Resize(device=device_type, resize_shorter=(image_size*256/224))
