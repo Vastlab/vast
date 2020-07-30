@@ -1,6 +1,8 @@
 import torch
 from torch.nn import functional as F
 
+from .. import tools
+
 """
 For usage consult https://github.com/Vastlab/MNIST_Experiments/blob/master/MNIST_SoftMax_Training.py
 """
@@ -47,7 +49,7 @@ class tensor_center_loss:
         """
         self.beta = beta
         self.euclidean_dist_obj = torch.nn.PairwiseDistance(p=2)
-        self.centers = torch.zeros((len(classes), fc_layer_dimension)).requires_grad_(requires_grad=False).cuda()
+        self.centers = tools.device(torch.zeros((len(classes), fc_layer_dimension)).requires_grad_(requires_grad=False))
         if initial_value is not None:
             for cls_no in classes:
                 self.centers[cls_no] = torch.tensor(initial_value[cls_no])
@@ -80,12 +82,12 @@ class objecto_center_loss(tensor_center_loss):
 class entropic_openset_loss():
     def __init__(self, num_of_classes=10):
         self.num_of_classes = num_of_classes
-        self.eye = torch.eye(self.num_of_classes).cuda()
-        self.ones = torch.ones(self.num_of_classes).cuda()
+        self.eye = tools.device(torch.eye(self.num_of_classes))
+        self.ones = tools.device(torch.ones(self.num_of_classes))
         self.unknowns_multiplier = 1. / self.num_of_classes
 
     def __call__(self, logit_values, target, sample_weights=None):
-        catagorical_targets = torch.zeros(logit_values.shape).cuda()
+        catagorical_targets = tools.device(torch.zeros(logit_values.shape))
         known_indexes = target != -1
         unknown_indexes = ~known_indexes
         catagorical_targets[known_indexes, :] = self.eye[target[known_indexes]]
@@ -102,16 +104,16 @@ class entropic_openset_loss():
 class objectoSphere_loss():
     def __init__(self, batch_size, knownsMinimumMag=50.):
         self.knownsMinimumMag = knownsMinimumMag
-        self.knownsMinimumMag_tensor = torch.ones(batch_size).cuda() * self.knownsMinimumMag
-        self.zeros = torch.zeros(batch_size).cuda()
+        self.knownsMinimumMag_tensor = tools.device(torch.ones(batch_size)) * self.knownsMinimumMag
+        self.zeros = tools.device(torch.zeros(batch_size))
         self.batch_size = batch_size
 
     def __call__(self, features, target, sample_weights=None):
         features_ = features.detach()
         mag = features_.norm(p=2, dim=1)
         if features.shape[0]!=self.batch_size:
-            self.knownsMinimumMag_tensor = torch.ones(features.shape[0]).cuda() * self.knownsMinimumMag
-            self.zeros = torch.zeros(features.shape[0]).cuda()
+            self.knownsMinimumMag_tensor = tools.device(torch.ones(features.shape[0])) * self.knownsMinimumMag
+            self.zeros = tools.device(torch.zeros(features.shape[0]))
             self.batch_size = features.shape[0]
         # For knowns magnitude minus \beta is loss
         mag_diff_from_ring = torch.clamp(self.knownsMinimumMag_tensor - mag, min=0.)
