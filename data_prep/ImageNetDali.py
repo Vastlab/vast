@@ -69,13 +69,26 @@ class ExternalSourcePipeline(Pipeline):
         self.input_label = nvidia_ops.ExternalSource()
         self.training = training
         self.crop_loc = nvidia_ops.Uniform(range=(0.,1.))
+        self.anchor_loc = nvidia_ops.Uniform(range=(0.,1.),shape =(4,))
+        self.shape_loc = nvidia_ops.Uniform(range=(0.2,0.5),shape =(4,))
         self.coin = nvidia_ops.CoinFlip(probability=0.5)
         self.rotation_angle = nvidia_ops.Uniform(range=(-45.,45.))
-        self.decode = nvidia_ops.ImageDecoder(device="mixed" if device_type=="gpu" else "cpu", output_type=nvidia_types.RGB)
+        self.train_decode = nvidia_ops.ImageDecoderRandomCrop(device="mixed" if device_type=="gpu" else "cpu",
+                                                              device_memory_padding = 211025920,
+                                                              host_memory_padding = 140544512,
+                                                              output_type=nvidia_types.RGB,
+                                                              random_aspect_ratio=[0.5,4.],
+                                                              random_area=[0.1,1.0],
+                                                              num_attempts=100)
+        self.val_decode = nvidia_ops.ImageDecoder(device="mixed" if device_type=="gpu" else "cpu", output_type=nvidia_types.RGB)
         self.rotate = nvidia_ops.Rotate(device=device_type)
+        self.erase = nvidia_ops.Erase(device=device_type, axis_names="HW", centered_anchor=True, normalized=True, fill_value=0.5)
         self.resize = nvidia_ops.Resize(device=device_type, resize_shorter=(image_size*256/224))
-        self.crop_mirror_normalize = nvidia_ops.CropMirrorNormalize(device=device_type, crop=(image_size,image_size),
-                                                                    mean=128,std=128,output_layout='HWC')
+        self.crop_mirror_normalize = nvidia_ops.CropMirrorNormalize(device=device_type,
+                                                                    crop=(image_size,image_size),
+                                                                    mean=[0.485*255, 0.456*255, 0.406*255],
+                                                                    std=[0.229*255, 0.224*255, 0.225*255],
+                                                                    output_layout='HWC')#nvidia_types.NCHW)#'HWC')
         self.jitter = nvidia_ops.Jitter(device="gpu", nDegree=4)
         self.transpose = nvidia_ops.Transpose(device="gpu",perm=(2,0,1))
         self.cast = nvidia_ops.Cast(device="gpu", dtype=nvidia_types.FLOAT)
@@ -83,18 +96,21 @@ class ExternalSourcePipeline(Pipeline):
         self.iterator = iter(self.external_data)
         self.device_type = device_type
 
-    def training_data_augmentation(self, images):
+    def training_data_augmentation(self):
+        images = self.train_decode(self.jpegs)
         images = self.rotate(images, angle=self.rotation_angle())
         images = self.resize(images)
         images = self.crop_mirror_normalize(images, crop_pos_x=self.crop_loc(), crop_pos_y=self.crop_loc(),
                                             mirror=self.coin())
+        images = self.erase(images, anchor=self.anchor_loc(), shape=self.shape_loc())
         if self.device_type!="gpu":
             images = images.gpu()
         # Does not work https://github.com/NVIDIA/DALI/issues/966
         images = self.jitter(images)
         return images
 
-    def validation_data_augmentation(self, images):
+    def validation_data_augmentation(self):
+        images = self.val_decode(self.jpegs)
         images = self.resize(images)
         images = self.crop_mirror_normalize(images)
         if self.device_type!="gpu":
@@ -104,11 +120,10 @@ class ExternalSourcePipeline(Pipeline):
     def define_graph(self):
         self.jpegs = self.input()
         self.labels = self.input_label()
-        images = self.decode(self.jpegs)
         if self.training:
-            images = self.training_data_augmentation(images)
+            images = self.training_data_augmentation()
         else:
-            images = self.validation_data_augmentation(images)
+            images = self.validation_data_augmentation()
         images = self.transpose(images)
         output = self.cast(images)
         return (output, self.labels)
