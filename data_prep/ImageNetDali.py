@@ -78,7 +78,7 @@ class ExternalSourcePipeline(Pipeline):
                                                               host_memory_padding = 140544512,
                                                               output_type=nvidia_types.RGB,
                                                               random_aspect_ratio=[0.5,4.],
-                                                              random_area=[0.1,1.0],
+                                                              random_area=[0.01,1.0],
                                                               num_attempts=100)
         self.val_decode = nvidia_ops.ImageDecoder(device="mixed" if device_type=="gpu" else "cpu", output_type=nvidia_types.RGB)
         self.rotate = nvidia_ops.Rotate(device=device_type)
@@ -88,7 +88,7 @@ class ExternalSourcePipeline(Pipeline):
                                                                     crop=(image_size,image_size),
                                                                     mean=[0.485*255, 0.456*255, 0.406*255],
                                                                     std=[0.229*255, 0.224*255, 0.225*255],
-                                                                    output_layout='HWC')#nvidia_types.NCHW)#'HWC')
+                                                                    output_layout='HWC')
         self.jitter = nvidia_ops.Jitter(device="gpu", nDegree=4)
         self.transpose = nvidia_ops.Transpose(device="gpu",perm=(2,0,1))
         self.cast = nvidia_ops.Cast(device="gpu", dtype=nvidia_types.FLOAT)
@@ -105,7 +105,6 @@ class ExternalSourcePipeline(Pipeline):
         images = self.erase(images, anchor=self.anchor_loc(), shape=self.shape_loc())
         if self.device_type!="gpu":
             images = images.gpu()
-        # Does not work https://github.com/NVIDIA/DALI/issues/966
         images = self.jitter(images)
         return images
 
