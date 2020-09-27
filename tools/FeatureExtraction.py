@@ -13,13 +13,21 @@ from torch.utils.data import Dataset
 from PIL import Image
 from tqdm import tqdm
 
+def deep_get(dict_obj, key):
+    d = dict_obj
+    for k in key.split(":s:"):
+        if type(d) == torch.nn.modules.container.Sequential:
+            d = d.__dict__['_modules']
+        d = d[k]
+    return d
+
 class Model_Operations():
     def __init__(self, model, layer_names):
         self.model = model
         self.outputs = []
         self.layer_names = layer_names
         for layer_name in layer_names:
-            self.model.__dict__['_modules'][layer_name].register_forward_hook(self.feature_hook)
+            deep_get(self.model.__dict__['_modules'], layer_name).register_forward_hook(self.feature_hook)
 
     def feature_hook(self, module, input, output):
         self.outputs.append(output)
@@ -69,17 +77,17 @@ def main(args):
     if args.arch in pytorch_models:
         model = models.__dict__[args.arch](pretrained=True)
 
-    print("\n\n######### Model Architecture ##############")
+    print(f"\n\n######### Model Architecture for {args.arch} ##############")
     print(model)
-    print("######### Model Architecture ##############\n\n")
+    print(f"######### Model Architecture for {args.arch} ##############\n\n")
 
     model.eval()
     model = model.to('cuda')
     modelObj = Model_Operations(model, args.layer_names)
 
+
     output_file_path = pathlib.Path(f"{args.output_path}/{args.arch}/")
     output_file_path.mkdir(parents=True, exist_ok=False)
-    # for file_name in ['imagenet_360.csv']:
     for file_name in ['imagenet_1000_val.csv','imagenet_360.csv']:
         if '360' in file_name:
             pbar = tqdm(total=360)
@@ -151,7 +159,6 @@ if __name__ == '__main__':
     parser.add_argument("--input-csv-path", help="directory path containing imagenet csvs",
                         default="/home/jschwan2/simclr-converter/", required=False)
     parser.add_argument("--output-path", help="output directory path", default="", required=True)
-    # parser.add_argument("--debug", help="debugging flag", action="store_true", default=False)
     parser.add_argument("--batch-size", help="Number of samples per forward pass", default=256, type=int)
     args = parser.parse_args()
 
@@ -160,7 +167,7 @@ if __name__ == '__main__':
                             if name.islower() and not name.startswith("__")
                             and callable(models.__dict__[name]))
     for pm in pytorch_models:
-        if 'resnet' in pm:
+        if 'mnasnet' in pm:
             args.arch = pm
     """
     main(args)
