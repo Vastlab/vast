@@ -173,7 +173,7 @@ def sigmoid_2D_plotter(
 
 
 
-def plot_OSRC(to_plot, no_of_false_positives=None, filename=None):
+def plot_OSRC(to_plot, no_of_false_positives=None, filename=None, title=None):
     """
     :param to_plot: list of tuples containing (knowns_accuracy,OSE,label_name)
     :param no_of_false_positives: To write on the x axis
@@ -181,6 +181,8 @@ def plot_OSRC(to_plot, no_of_false_positives=None, filename=None):
     :return: None
     """
     fig, ax = plt.subplots()
+    if title != None:
+        fig.suptitle(title, fontsize=20)
     for plot_no, (knowns_accuracy,OSE,label_name) in enumerate(to_plot):
         ax.plot(OSE, knowns_accuracy, label=label_name)
     ax.set_xscale('log')
