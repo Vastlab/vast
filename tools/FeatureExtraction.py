@@ -16,7 +16,7 @@ from tqdm import tqdm
 def deep_get(dict_obj, key):
     d = dict_obj
     for k in key.split(":s:"):
-        if type(d) == torch.nn.modules.container.Sequential:
+        if type(d) == torch.nn.modules.container.Sequential or type(d) == torchvision.models.resnet.Bottleneck:
             d = d.__dict__['_modules']
         d = d[k]
     return d
