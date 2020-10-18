@@ -80,8 +80,8 @@ def main(args):
     if args.weights is not None:
         state_dict = torch.load(args.weights, map_location="cpu")['state_dict']
         for k in list(state_dict.keys()):
-            if k.startswith('module.'):
-                state_dict[k[len("module."):]] = state_dict[k]
+            if k.startswith('module.encoder_q') and not k.startswith('module.encoder_q.fc'):
+                state_dict[k[len("module.encoder_q."):]] = state_dict[k]
             del state_dict[k]
         msg = model.load_state_dict(state_dict, strict=False)
         print(f"msg {msg}")
