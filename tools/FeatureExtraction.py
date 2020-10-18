@@ -76,6 +76,15 @@ def main(args):
                             and callable(models.__dict__[name]))
     if args.arch in pytorch_models:
         model = models.__dict__[args.arch](pretrained=True)
+    # Currently only specific to MoCoV2
+    if args.weights is not None:
+        state_dict = torch.load(args.weights, map_location="cpu")['state_dict']
+        for k in list(state_dict.keys()):
+            if k.startswith('module.'):
+                state_dict[k[len("module."):]] = state_dict[k]
+            del state_dict[k]
+        msg = model.load_state_dict(state_dict, strict=False)
+        print(f"msg {msg}")
 
     print(f"\n\n######### Model Architecture for {args.arch} ##############")
     print(model)
@@ -88,18 +97,17 @@ def main(args):
 
     output_file_path = pathlib.Path(f"{args.output_path}/{args.arch}/")
     output_file_path.mkdir(parents=True, exist_ok=False)
-    for file_name in ['imagenet_1000_val.csv','imagenet_360.csv']:
+    for file_name in ['imagenet_1000_train.csv','imagenet_1000_val.csv','imagenet_360.csv']:
         if '360' in file_name:
             pbar = tqdm(total=360)
         else:
             pbar = tqdm(total=1000)
-        val_loader = torch.utils.data.DataLoader(ImageNetPytorch(args.input_csv_path + file_name,
-                                                                 args.images_path),
-                                                 batch_size=args.batch_size,
-                                                 shuffle=False,
-                                                 num_workers=1*mp.cpu_count(),
-                                                 pin_memory=False)
-
+        data_loader = torch.utils.data.DataLoader(ImageNetPytorch(args.input_csv_path + file_name,
+                                                                  args.images_path),
+                                                  batch_size=args.batch_size,
+                                                  shuffle=False,
+                                                  num_workers=1*mp.cpu_count(),
+                                                  pin_memory=False)
         current_class = None
         current_class_im_name = []
         current_class_layer_outputs = []
@@ -109,7 +117,7 @@ def main(args):
         hf = h5py.File(f"{output_file_path}/{file_name.split('.csv')[0]}.hdf5", "w")
 
         with torch.no_grad():
-            for i, (images, img_name, gt_class) in enumerate(val_loader):
+            for i, (images, img_name, gt_class) in enumerate(data_loader):
                 images = images.cuda()
                 layer_outputs = modelObj(images)
                 for layer in layer_outputs:
@@ -155,7 +163,9 @@ if __name__ == '__main__':
                         help="Layer names to extract",
                         default=["fc"])
     parser.add_argument("--images-path", help="directory containing imagenet images",
-                        default="/net/ironman/scratch/datasets/ImageNet/ILSVRC_2012/", required=False)
+                        default="/net/ironman/scratch/datasets/ImageNet/", required=False)
+    parser.add_argument("--weights", help="network weights",
+                        default=None, required=False)
     parser.add_argument("--input-csv-path", help="directory path containing imagenet csvs",
                         default="/home/jschwan2/simclr-converter/", required=False)
     parser.add_argument("--output-path", help="output directory path", default="", required=True)
