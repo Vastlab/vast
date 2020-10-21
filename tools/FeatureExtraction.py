@@ -150,6 +150,7 @@ def main(args):
                     g.create_dataset(layer, data=layer_outputs[layer])
                 pbar.update(1)
         pbar.close()
+        hf.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
