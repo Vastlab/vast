@@ -146,8 +146,8 @@ def main(args):
                 g = hf.create_group(current_class)
                 g.create_dataset('image_names',
                                  data=np.array(current_class_im_name, dtype=h5py.string_dtype(encoding='utf-8')))
-                for layer in layer_outputs:
-                    g.create_dataset(layer, data=layer_outputs[layer])
+                for layer_no, layer in enumerate(layer_outputs):
+                    g.create_dataset(layer, data=np.array(current_class_layer_outputs[layer_no]))
                 pbar.update(1)
         pbar.close()
         hf.close()
