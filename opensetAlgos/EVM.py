@@ -66,7 +66,6 @@ def EVM(pos_classes_to_process, features_all_classes, args, gpu, models=None):
             temp = []
     if len(temp) > 0:
         negative_classes_for_current_batch.append(torch.cat(temp))
-
     for pos_cls_name in pos_classes_to_process:
         # Find positive class features
         positive_cls_feature = features_all_classes[pos_cls_name].cuda()
@@ -88,10 +87,10 @@ def EVM(pos_classes_to_process, features_all_classes, args, gpu, models=None):
         if len(temp)>0:
             negative_classes_for_current_class.append(torch.cat(temp))
         negative_classes_for_current_class.extend(negative_classes_for_current_batch)
-        print(f"Negative classes for current class: {no_of_negative_classes_for_current_batch + neg_cls_current_batch}")
 
         negative_distances=[]
         for batch_no, neg_features in enumerate(negative_classes_for_current_class):
+            assert positive_cls_feature.shape[0] != 0 and neg_features.shape[0] != 0
             distances = pairwisedistances.__dict__[args.distance_metric](positive_cls_feature, neg_features.cuda())
             # Store bottom k distances from each batch to the cpu
             sortedTensor = torch.topk(distances,
@@ -126,12 +125,14 @@ def EVM(pos_classes_to_process, features_all_classes, args, gpu, models=None):
 
         yield (pos_cls_name, dict(extreme_vectors = extreme_vectors,
                                   weibulls = extreme_vectors_models))
+    print(f"Negative classes used for the last class processed: {no_of_negative_classes_for_current_batch + neg_cls_current_batch}")
     print(f"Last Extreme vector shape was {extreme_vectors.shape}")
 
 
 def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, models=None):
     for pos_cls_name in pos_classes_to_process:
         test_cls_feature = features_all_classes[pos_cls_name].cuda()
+        assert test_cls_feature.shape[0]!=0
         probs=[]
         for cls_no, cls_name in enumerate(sorted(models.keys())):
             distances = pairwisedistances.__dict__[args.distance_metric](test_cls_feature,
