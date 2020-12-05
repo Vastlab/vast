@@ -1,7 +1,6 @@
 import torch
 from ..tools import pairwisedistances
 from ..DistributionModels import weibull
-from ..clusteringAlgos import clustering
 
 def fit_high(distances, distance_multiplier, tailsize):
     if tailsize<1:
@@ -18,8 +17,8 @@ def OpenMax(pos_classes_to_process, features_all_classes, args, gpu, models=None
         MAV = torch.mean(features,dim=0).to(f"cuda:{gpu}")
         distances = pairwisedistances.__dict__[args.distance_metric](features, MAV[None,:])
         weibull_model = fit_high(distances.T, args.distance_multiplier, args.tailsize)
-        yield dict(exemplars = MAV.cpu(),
-                   weibulls = weibull_model)
+        yield (pos_cls_name, dict(MAV = MAV.cpu()[None,:],
+                                  weibulls = weibull_model))
 
 def OpenMax_Inference(pos_classes_to_process, features_all_classes, args, gpu, models):
     for pos_cls_name in pos_classes_to_process:
@@ -28,11 +27,12 @@ def OpenMax_Inference(pos_classes_to_process, features_all_classes, args, gpu, m
         for class_name in sorted(models.keys()):
             MAV = models[class_name]['MAV'].to(f"cuda:{gpu}")
             distances = pairwisedistances.__dict__[args.distance_metric](features, MAV[None, :])
-            probs.append(1 - models[class_name]['weibull_model'].wscore(distances.cpu()))
+            probs.append(1 - models[class_name]['weibulls'].wscore(distances.cpu()))
         probs = torch.cat(probs,dim=1)
         yield (pos_cls_name, probs)
 
 def MultiModalOpenMax(pos_classes_to_process, features_all_classes, args, gpu, models=None):
+    from ..clusteringAlgos import clustering
     for pos_cls_name in pos_classes_to_process:
         features = features_all_classes[pos_cls_name]
         # clustering
@@ -62,8 +62,8 @@ def MultiModalOpenMax(pos_classes_to_process, features_all_classes, args, gpu, m
                                   translateAmountTensor=None,
                                   smallScoreTensor=smallScoreTensor))
         mr.tocpu()
-        yield dict(MAVs = MAVs.cpu(),
-                   weibulls = mr)
+        yield (pos_cls_name, dict(MAVs = MAVs.cpu(),
+                                  weibulls = mr))
 
 def MultiModalOpenMax_Inference(pos_classes_to_process, features_all_classes, args, gpu, models=None):
     for pos_cls_name in pos_classes_to_process:
