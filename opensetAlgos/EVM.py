@@ -1,4 +1,5 @@
 import torch
+import itertools
 from ..tools import pairwisedistances
 from ..DistributionModels import weibull
 
@@ -53,7 +54,7 @@ def set_cover(mr_model, positive_distances, cover_threshold):
     del params
     return (extreme_vectors_models, extreme_vectors_indexes, covered_vectors)
 
-def EVM(pos_classes_to_process, features_all_classes, args, gpu, models=None):
+def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models=None):
     chunk_size = 200
     negative_classes_for_current_batch = []
     no_of_negative_classes_for_current_batch = 0
@@ -69,11 +70,9 @@ def EVM(pos_classes_to_process, features_all_classes, args, gpu, models=None):
     for pos_cls_name in pos_classes_to_process:
         # Find positive class features
         positive_cls_feature = features_all_classes[pos_cls_name].cuda()
-        if args.tailsize<=1:
-            tailsize = args.tailsize*positive_cls_feature.shape[0]
-        else:
-            tailsize = args.tailsize
-        tailsize = int(tailsize)
+        tailsize = max(args.tailsize)
+        if tailsize<=1:
+            tailsize = int(tailsize*positive_cls_feature.shape[0])
 
         negative_classes_for_current_class=[]
         temp = []
@@ -110,21 +109,23 @@ def EVM(pos_classes_to_process, features_all_classes, args, gpu, models=None):
             "Distances of samples to themselves is not zero"
         sortedTensor = torch.cat(negative_distances, dim=1).to(f"cuda:{gpu}")
 
-        # Perform actual EVM training
-        try:
-            weibull_model = fit_low(sortedTensor, args.distance_multiplier, tailsize, gpu)
-        except:
-            # TODO: RAISE ERROR
-            print("Failed a probable reason is you did not give any negative samples to find distances to")
-        extreme_vectors_models, extreme_vectors_indexes, covered_vectors = set_cover(weibull_model,
-                                                                                     positive_distances.cuda(),
-                                                                                     args.cover_threshold)
-        extreme_vectors = torch.gather(positive_cls_feature, 0, extreme_vectors_indexes[:,None].cuda().repeat(1,positive_cls_feature.shape[1]))
-        extreme_vectors_models.tocpu()
-        extreme_vectors = extreme_vectors.cpu()
-
-        yield (pos_cls_name, dict(extreme_vectors = extreme_vectors,
-                                  weibulls = extreme_vectors_models))
+        for distance_multiplier, cover_threshold, org_tailsize in itertools.product(args.distance_multiplier,
+                                                                                args.cover_threshold, args.tailsize):
+            if org_tailsize <= 1:
+                tailsize = int(org_tailsize * positive_cls_feature.shape[0])
+            else:
+                tailsize = org_tailsize
+            # Perform actual EVM training
+            weibull_model = fit_low(sortedTensor, distance_multiplier, tailsize, gpu)
+            extreme_vectors_models, extreme_vectors_indexes, covered_vectors = set_cover(weibull_model,
+                                                                                         positive_distances.cuda(),
+                                                                                         cover_threshold)
+            extreme_vectors = torch.gather(positive_cls_feature, 0, extreme_vectors_indexes[:,None].cuda().repeat(1,positive_cls_feature.shape[1]))
+            extreme_vectors_models.tocpu()
+            extreme_vectors = extreme_vectors.cpu()
+            yield (f"TS_{org_tailsize}_DM_{distance_multiplier:.2f}_CT_{cover_threshold:.2f}",
+                   (pos_cls_name,dict(extreme_vectors = extreme_vectors,
+                                      weibulls = extreme_vectors_models)))
     print(f"Negative classes used for the last class processed: {no_of_negative_classes_for_current_batch + neg_cls_current_batch}")
     print(f"Last Extreme vector shape was {extreme_vectors.shape}")
 
@@ -140,4 +141,4 @@ def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, model
             probs_current_class = models[cls_name]['weibulls'].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
         probs = torch.stack(probs,dim=-1).cpu()
-        yield (pos_cls_name,probs)
+        yield ("probs", (pos_cls_name, probs))
