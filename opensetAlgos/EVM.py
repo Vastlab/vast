@@ -123,8 +123,9 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
             extreme_vectors = torch.gather(positive_cls_feature, 0, extreme_vectors_indexes[:,None].cuda().repeat(1,positive_cls_feature.shape[1]))
             extreme_vectors_models.tocpu()
             extreme_vectors = extreme_vectors.cpu()
-            yield (pos_cls_name, {f"TS_{org_tailsize}_DM_{distance_multiplier:.2f}_CT_{cover_threshold:.2f}":dict(extreme_vectors = extreme_vectors,
-                                                                                                      weibulls = extreme_vectors_models)})
+            yield (f"TS_{org_tailsize}_DM_{distance_multiplier:.2f}_CT_{cover_threshold:.2f}",
+                   (pos_cls_name,dict(extreme_vectors = extreme_vectors,
+                                      weibulls = extreme_vectors_models)))
     print(f"Negative classes used for the last class processed: {no_of_negative_classes_for_current_batch + neg_cls_current_batch}")
     print(f"Last Extreme vector shape was {extreme_vectors.shape}")
 
@@ -140,4 +141,4 @@ def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, model
             probs_current_class = models[cls_name]['weibulls'].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
         probs = torch.stack(probs,dim=-1).cpu()
-        yield (pos_cls_name, {"probs":probs})
+        yield ("probs", (pos_cls_name, probs))
