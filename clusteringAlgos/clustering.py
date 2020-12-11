@@ -146,7 +146,12 @@ def dbscan(x, distance_metric, eps=0.3, min_samples=10, *args_passed, **kargs):
     return centroids, torch.tensor(db.labels_) #,db.core_sample_indices_
 
 def finch(x, ind_of_interest=-1, *args_passed, **kargs):
-    c, num_clust, req_c = FINCH(x.numpy(),verbose=False)
-    c = torch.tensor(c[:,ind_of_interest])[:,None].type(torch.LongTensor).repeat(1, x.shape[1])
-    centroids = x.gather(0, c)#.cpu().clone()
-    return centroids, c[:,ind_of_interest].cuda()
+    c, num_clust, req_c = FINCH(x.cpu().numpy(),verbose=False)
+    num_clust_obtained = num_clust[ind_of_interest]
+    assignments_of_interest = torch.tensor(c[:,ind_of_interest]).type(torch.LongTensor).cuda()
+    centroids = []
+    x = x.cuda()
+    for i in range(num_clust_obtained):
+        centroids.append(torch.mean(x[assignments_of_interest==i],dim=0))
+    centroids = torch.stack(centroids)
+    return centroids, assignments_of_interest
