@@ -4,7 +4,7 @@ from ..tools import pairwisedistances
 from ..DistributionModels import weibull
 
 def fit_high(distances, distance_multiplier, tailsize):
-    if tailsize<1:
+    if tailsize<=1:
         tailsize = min(tailsize*distances.shape[1], distances.shape[1])
     tailsize = int(min(tailsize,distances.shape[1]))
     mr = weibull.weibull()
@@ -53,15 +53,15 @@ def MultiModalOpenMax_Training(pos_classes_to_process, features_all_classes, arg
             wbFits=[]
             smallScoreTensor=[]
             for MAV_no in set(assignments.cpu().tolist())-{-1}:
-                MAV = centroids[MAV_no,:][None,:].cuda()
+                MAV = centroids[MAV_no,:].cuda()
                 f = features[assignments == MAV_no].cuda()
-                distances = pairwisedistances.__dict__[args.distance_metric](f, MAV)
+                distances = pairwisedistances.__dict__[args.distance_metric](f, MAV[None,:])
                 weibull_model = fit_high(distances.T, distance_multiplier, tailsize)
                 MAVs.append(MAV)
                 wbFits.append(weibull_model.wbFits)
                 smallScoreTensor.append(weibull_model.smallScoreTensor)
             wbFits=torch.cat(wbFits)
-            MAVs=torch.cat(MAVs)
+            MAVs=torch.stack(MAVs)
             smallScoreTensor=torch.cat(smallScoreTensor)
             mr = weibull.weibull(dict(Scale=wbFits[:,1],
                                       Shape=wbFits[:,0],
@@ -83,5 +83,4 @@ def MultiModalOpenMax_Inference(pos_classes_to_process, features_all_classes, ar
             probs_current_class = 1-models[cls_name]['weibulls'].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
         probs = torch.stack(probs,dim=-1).cpu()
-        print(f"probs {probs}")
         yield ("probs", (pos_cls_name, probs))
