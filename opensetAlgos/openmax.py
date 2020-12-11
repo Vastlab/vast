@@ -29,7 +29,7 @@ def OpenMax_Inference(pos_classes_to_process, features_all_classes, args, gpu, m
         probs=[]
         for class_name in sorted(models.keys()):
             MAV = models[class_name]['MAV'].to(f"cuda:{gpu}")
-            distances = pairwisedistances.__dict__[args.distance_metric](features, MAV[None, :])
+            distances = pairwisedistances.__dict__[args.distance_metric](features, MAV)
             probs.append(1 - models[class_name]['weibulls'].wscore(distances.cpu()))
         probs = torch.cat(probs,dim=1)
         yield ("probs",(pos_cls_name, probs))
