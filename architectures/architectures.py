@@ -2,7 +2,7 @@ import torch.nn as nn
 import torchvision.models as models
 
 class LeNet_plus_plus(nn.Module):
-    def __init__(self, use_classification_layer=True, use_BG=False):
+    def __init__(self, use_classification_layer=True, use_BG=False, num_classes=10):
         super(LeNet_plus_plus, self).__init__()
         self.conv1_1 = nn.Conv2d(in_channels=1,out_channels=32,kernel_size=(5,5),stride=1,padding=2)
         self.conv1_2 = nn.Conv2d(in_channels=self.conv1_1.out_channels,out_channels=32,kernel_size=(5,5),stride=1,padding=2)
@@ -17,9 +17,9 @@ class LeNet_plus_plus(nn.Module):
         self.fc1 = nn.Linear(in_features=self.conv3_2.out_channels*3*3, out_features=2,bias=True)
         if use_classification_layer:
             if use_BG:
-                self.fc2 = nn.Linear(in_features=2, out_features=11,bias=True)
+                self.fc2 = nn.Linear(in_features=2, out_features=num_classes+1,bias=True)
             else:
-                self.fc2 = nn.Linear(in_features=2, out_features=10, bias=True)
+                self.fc2 = nn.Linear(in_features=2, out_features=num_classes, bias=True)
         self.use_classification_layer=use_classification_layer
         self.prelu_act=nn.PReLU()
         
