@@ -3,6 +3,20 @@ import itertools
 from ..tools import pairwisedistances
 from ..DistributionModels import weibull
 
+def EVM_Params(parser):
+    EVM_params_parser = parser.add_argument_group('EVM params')
+    EVM_params_parser.add_argument("--tailsize", nargs="+", type=float, default=[1.0],
+                                   help="tail size to use\ndefault: %(default)s")
+    EVM_params_parser.add_argument("--cover_threshold", nargs="+", type=float, default=[0.7],
+                                   help="cover threshold to use\ndefault: %(default)s")
+    EVM_params_parser.add_argument("--distance_multiplier", nargs="+", type=float, default=[0.55],
+                                   help="distance multiplier to use\ndefault: %(default)s")
+    EVM_params_parser.add_argument('--distance_metric', default='euclidean', type=str, choices=['cosine','euclidean'],
+                                   help='distance metric to use\ndefault: %(default)s')
+    return parser
+
+
+
 def fit_low(distances, distance_multiplier, tailsize, gpu):
     mr = weibull.weibull()
     mr.FitLow(distances.double() * distance_multiplier, min(tailsize,distances.shape[1]), isSorted=False, gpu=gpu)
