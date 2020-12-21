@@ -9,7 +9,7 @@ def cosine(x, y):
     return distances
 
 def euclidean(x, y):
-    distances = torch.cdist(x, y, p=2.0, compute_mode='use_mm_for_euclid_dist_if_necessary')
+    distances = torch.cdist(x, y, p=2.0, compute_mode='donot_use_mm_for_euclid_dist')
     return distances
 
 __dict__ = {'cosine':cosine,
