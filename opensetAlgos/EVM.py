@@ -4,7 +4,7 @@ from ..tools import pairwisedistances
 from ..DistributionModels import weibull
 
 def EVM_Params(parser):
-    EVM_params_parser = parser.add_argument_group('EVM params')
+    EVM_params_parser = parser.add_argument_group(title="EVM",description="EVM params")
     EVM_params_parser.add_argument("--tailsize", nargs="+", type=float, default=[1.0],
                                    help="tail size to use\ndefault: %(default)s")
     EVM_params_parser.add_argument("--cover_threshold", nargs="+", type=float, default=[0.7],
@@ -13,7 +13,10 @@ def EVM_Params(parser):
                                    help="distance multiplier to use\ndefault: %(default)s")
     EVM_params_parser.add_argument('--distance_metric', default='euclidean', type=str, choices=['cosine','euclidean'],
                                    help='distance metric to use\ndefault: %(default)s')
-    return parser
+    return parser, dict(group_parser = EVM_params_parser,
+                        param_names = ("tailsize", "distance_multiplier", "cover_threshold"),
+                        param_id_string = "TS_{}_DM_{:.2f}_CT_{:.2f}")
+
 
 
 
