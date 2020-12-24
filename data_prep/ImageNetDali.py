@@ -7,8 +7,6 @@ from nvidia.dali.pipeline import Pipeline
 import nvidia.dali.ops as nvidia_ops
 import nvidia.dali.types as nvidia_types
 
-# Don't need to inherit from 'object' in Python3 onwards
-# Only needed for backward compatibility: https://stackoverflow.com/questions/4015417/python-class-inherits-object
 class ExternalInputIterator():
     def __init__(self, batch_size, device_id, num_gpus, filenames, images_path,
                  debug=False, random_seed=None, unknowns_label=-1):
