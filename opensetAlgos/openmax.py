@@ -11,7 +11,9 @@ def OpenMax_Params(parser):
                                 help="distance multiplier to use default: %(default)s")
     OpenMax_params.add_argument('--distance_metric', default='cosine', type=str, choices=['cosine','euclidean'],
                                 help='distance metric to use default: %(default)s')
-    return parser
+    return parser, dict(group_parser = OpenMax_params,
+                        param_names = ("tailsize", "distance_multiplier"),
+                        param_id_string = "TS_{}_DM_{:.2f}")
 
 def fit_high(distances, distance_multiplier, tailsize):
     if tailsize<=1:

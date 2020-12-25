@@ -15,7 +15,9 @@ def MultiModalOpenMax_Params(parser):
     MultiModalOpenMax_params.add_argument('--Clustering_Algo', default='finch', type=str,
                                           choices=['KMeans','dbscan','finch'],
                                           help='Clustering algorithm used for multi modal openmax default: %(default)s')
-    return parser
+    return parser, dict(group_parser = MultiModalOpenMax_params,
+                        param_names = ("tailsize", "distance_multiplier"),
+                        param_id_string = "TS_{}_DM_{:.2f}")
 
 def MultiModalOpenMax_Training(pos_classes_to_process, features_all_classes, args, gpu, models=None):
     from ..clusteringAlgos import clustering

@@ -4,7 +4,7 @@ from ..tools import pairwisedistances
 from ..DistributionModels import weibull
 
 def EVM_Params(parser):
-    EVM_params_parser = parser.add_argument_group('EVM params')
+    EVM_params_parser = parser.add_argument_group(title="EVM",description="EVM params")
     EVM_params_parser.add_argument("--tailsize", nargs="+", type=float, default=[1.0],
                                    help="tail size to use\ndefault: %(default)s")
     EVM_params_parser.add_argument("--cover_threshold", nargs="+", type=float, default=[0.7],
@@ -13,7 +13,13 @@ def EVM_Params(parser):
                                    help="distance multiplier to use\ndefault: %(default)s")
     EVM_params_parser.add_argument('--distance_metric', default='euclidean', type=str, choices=['cosine','euclidean'],
                                    help='distance metric to use\ndefault: %(default)s')
-    return parser
+    EVM_params_parser.add_argument("--chunk_size", type=int, default=200,
+                                   help="Number of classes per chunk, reduce this parameter if facing OOM "
+                                        "error\ndefault: %(default)s")
+    return parser, dict(group_parser = EVM_params_parser,
+                        param_names = ("tailsize", "distance_multiplier", "cover_threshold"),
+                        param_id_string = "TS_{}_DM_{:.2f}_CT_{:.2f}")
+
 
 
 
@@ -69,14 +75,15 @@ def set_cover(mr_model, positive_distances, cover_threshold):
     return (extreme_vectors_models, extreme_vectors_indexes, covered_vectors)
 
 def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models=None):
-    chunk_size = 200
+    # TODO: Convert args.chunk_size from number of classes per batch to number of samples per batch.
+    # This would be useful for handeling highly unbalanced number of samples per class.
     negative_classes_for_current_batch = []
     no_of_negative_classes_for_current_batch = 0
     temp = []
     for cls_name in set(features_all_classes.keys()) - set(pos_classes_to_process):
         no_of_negative_classes_for_current_batch+=1
         temp.append(features_all_classes[cls_name])
-        if len(temp) == chunk_size:
+        if len(temp) == args.chunk_size:
             negative_classes_for_current_batch.append(torch.cat(temp))
             temp = []
     if len(temp) > 0:
@@ -94,7 +101,7 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
         for cls_name in set(pos_classes_to_process)-{pos_cls_name}:
             neg_cls_current_batch+=1
             temp.append(features_all_classes[cls_name])
-            if len(temp) == chunk_size:
+            if len(temp) == args.chunk_size:
                 negative_classes_for_current_class.append(torch.cat(temp))
                 temp = []
         if len(temp)>0:
@@ -139,6 +146,7 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
             extreme_vectors = extreme_vectors.cpu()
             yield (f"TS_{org_tailsize}_DM_{distance_multiplier:.2f}_CT_{cover_threshold:.2f}",
                    (pos_cls_name,dict(extreme_vectors = extreme_vectors,
+                                      extreme_vectors_indexes=extreme_vectors_indexes,
                                       weibulls = extreme_vectors_models)))
     print(f"Negative classes used for the last class processed: {no_of_negative_classes_for_current_batch + neg_cls_current_batch}")
     print(f"Last Extreme vector shape was {extreme_vectors.shape}")
