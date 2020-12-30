@@ -126,7 +126,7 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
         # check if distances to self is zero
         e = torch.eye(positive_distances.shape[0]).type(torch.BoolTensor)
         assert torch.allclose(positive_distances[e].type(torch.FloatTensor), \
-                              torch.zeros(positive_distances.shape[0]),atol=1e-03) == True, \
+                              torch.zeros(positive_distances.shape[0]),atol=1e-06) == True, \
             "Distances of samples to themselves is not zero"
         sortedTensor = torch.cat(negative_distances, dim=1).to(f"cuda:{gpu}")
 
@@ -148,8 +148,6 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
                    (pos_cls_name,dict(extreme_vectors = extreme_vectors,
                                       extreme_vectors_indexes=extreme_vectors_indexes,
                                       weibulls = extreme_vectors_models)))
-    print(f"Negative classes used for the last class processed: {no_of_negative_classes_for_current_batch + neg_cls_current_batch}")
-    print(f"Last Extreme vector shape was {extreme_vectors.shape}")
 
 
 def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, models=None):
