@@ -90,7 +90,7 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
         negative_classes_for_current_batch.append(torch.cat(temp))
     for pos_cls_name in pos_classes_to_process:
         # Find positive class features
-        positive_cls_feature = features_all_classes[pos_cls_name].cuda()
+        positive_cls_feature = features_all_classes[pos_cls_name].to(f"cuda:{gpu}")
         tailsize = max(args.tailsize)
         if tailsize<=1:
             tailsize = int(tailsize*positive_cls_feature.shape[0])
@@ -108,18 +108,22 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
             negative_classes_for_current_class.append(torch.cat(temp))
         negative_classes_for_current_class.extend(negative_classes_for_current_batch)
 
+        bottom_k_distances = []
         negative_distances=[]
         for batch_no, neg_features in enumerate(negative_classes_for_current_class):
             assert positive_cls_feature.shape[0] != 0 and neg_features.shape[0] != 0
-            distances = pairwisedistances.__dict__[args.distance_metric](positive_cls_feature, neg_features.cuda())
+            distances = pairwisedistances.__dict__[args.distance_metric](positive_cls_feature,
+                                                                         neg_features.to(f"cuda:{gpu}"))
+            bottom_k_distances.append(distances)
+            bottom_k_distances = torch.cat(bottom_k_distances, dim=1).to(f"cuda:{gpu}")
             # Store bottom k distances from each batch to the cpu
-            sortedTensor = torch.topk(distances,
-                                      min(tailsize,distances.shape[1]),
-                                      dim = 1,
-                                      largest = False,
-                                      sorted = True).values
+            bottom_k_distances = [torch.topk(bottom_k_distances,
+                                             min(tailsize,bottom_k_distances.shape[1]),
+                                             dim = 1,
+                                             largest = False,
+                                             sorted = True).values]
             del distances
-            negative_distances.append(sortedTensor.cpu())
+        bottom_k_distances = bottom_k_distances[0]
 
         # Find distances to other samples of same class
         positive_distances = pairwisedistances.__dict__[args.distance_metric](positive_cls_feature, positive_cls_feature)
@@ -128,7 +132,6 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
         assert torch.allclose(positive_distances[e].type(torch.FloatTensor), \
                               torch.zeros(positive_distances.shape[0]),atol=1e-06) == True, \
             "Distances of samples to themselves is not zero"
-        sortedTensor = torch.cat(negative_distances, dim=1).to(f"cuda:{gpu}")
 
         for distance_multiplier, cover_threshold, org_tailsize in itertools.product(args.distance_multiplier,
                                                                                 args.cover_threshold, args.tailsize):
@@ -137,11 +140,12 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
             else:
                 tailsize = org_tailsize
             # Perform actual EVM training
-            weibull_model = fit_low(sortedTensor, distance_multiplier, tailsize, gpu)
+            weibull_model = fit_low(bottom_k_distances, distance_multiplier, tailsize, gpu)
             extreme_vectors_models, extreme_vectors_indexes, covered_vectors = set_cover(weibull_model,
-                                                                                         positive_distances.cuda(),
+                                                                                         positive_distances.to(f"cuda:{gpu}"),
                                                                                          cover_threshold)
-            extreme_vectors = torch.gather(positive_cls_feature, 0, extreme_vectors_indexes[:,None].cuda().repeat(1,positive_cls_feature.shape[1]))
+            extreme_vectors = torch.gather(positive_cls_feature, 0,
+                                           extreme_vectors_indexes[:,None].to(f"cuda:{gpu}").repeat(1,positive_cls_feature.shape[1]))
             extreme_vectors_models.tocpu()
             extreme_vectors = extreme_vectors.cpu()
             yield (f"TS_{org_tailsize}_DM_{distance_multiplier:.2f}_CT_{cover_threshold:.2f}",
@@ -152,12 +156,12 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
 
 def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, models=None):
     for pos_cls_name in pos_classes_to_process:
-        test_cls_feature = features_all_classes[pos_cls_name].cuda()
+        test_cls_feature = features_all_classes[pos_cls_name].to(f"cuda:{gpu}")
         assert test_cls_feature.shape[0]!=0
         probs=[]
         for cls_no, cls_name in enumerate(sorted(models.keys())):
             distances = pairwisedistances.__dict__[args.distance_metric](test_cls_feature,
-                                                                         models[cls_name]['extreme_vectors'].cuda())
+                                                                         models[cls_name]['extreme_vectors'].to(f"cuda:{gpu}"))
             probs_current_class = models[cls_name]['weibulls'].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
         probs = torch.stack(probs,dim=-1).cpu()
