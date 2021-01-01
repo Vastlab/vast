@@ -114,8 +114,8 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
             assert positive_cls_feature.shape[0] != 0 and neg_features.shape[0] != 0
             distances = pairwisedistances.__dict__[args.distance_metric](positive_cls_feature,
                                                                          neg_features.to(f"cuda:{gpu}"))
-            bottom_k_distances.append(distances)
-            bottom_k_distances = torch.cat(bottom_k_distances, dim=1).to(f"cuda:{gpu}")
+            bottom_k_distances.append(distances.cpu())
+            bottom_k_distances = torch.cat(bottom_k_distances, dim=1)
             # Store bottom k distances from each batch to the cpu
             bottom_k_distances = [torch.topk(bottom_k_distances,
                                              min(tailsize,bottom_k_distances.shape[1]),
@@ -123,7 +123,7 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
                                              largest = False,
                                              sorted = True).values]
             del distances
-        bottom_k_distances = bottom_k_distances[0]
+        bottom_k_distances = bottom_k_distances[0].to(f"cuda:{gpu}")
 
         # Find distances to other samples of same class
         positive_distances = pairwisedistances.__dict__[args.distance_metric](positive_cls_feature, positive_cls_feature)
