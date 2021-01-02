@@ -108,6 +108,8 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
             negative_classes_for_current_class.append(torch.cat(temp))
         negative_classes_for_current_class.extend(negative_classes_for_current_batch)
 
+        assert len(negative_classes_for_current_class)>1, \
+            "In order to train the EVM you need atleast one negative sample for each positive class"
         bottom_k_distances = []
         negative_distances=[]
         for batch_no, neg_features in enumerate(negative_classes_for_current_class):
