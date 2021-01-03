@@ -1,0 +1,3 @@
+[submodule "clusteringAlgos/FINCH"]
+	path = clusteringAlgos/FINCH
+	url = https://github.com/ssarfraz/FINCH-Clustering/
