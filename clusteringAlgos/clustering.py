@@ -1,5 +1,5 @@
 import sys
-from .finch import FINCH
+from .FINCH.python.finch import FINCH
 
 import torch
 import numpy as np

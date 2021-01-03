@@ -6,6 +6,10 @@ Some repositories using this repo are:
 [Self-Supervised Features Improve Open-World Learning](https://github.com/Vastlab/SSFiOWL)
 
 
+### Setup
+Clone with sub modules  
+```git clone --recurse-submodules https://github.com/Vastlab/utile.git```
+
 ### Loss Functions
 1. Entropic Openset loss
 2. Objectosphere loss
