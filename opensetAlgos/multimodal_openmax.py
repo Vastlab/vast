@@ -29,7 +29,7 @@ def MultiModalOpenMax_Training(pos_classes_to_process, features_all_classes, arg
         features = features.type(torch.FloatTensor)
         centroids, assignments = Clustering_Algo(features, K=min(features.shape[0], 100), verbose=False,
                                                  distance_metric=args.distance_metric)
-        features = features.cuda()
+        features = features.to(f"cuda:{gpu}")
         centroids = centroids.type(features.dtype)
         # TODO: This grid search is not optimized for speed due to redundant distance computation,
         #  needs to be improved if grid search for MultiModal OpenMax is used extensively on big datasets.
@@ -38,13 +38,17 @@ def MultiModalOpenMax_Training(pos_classes_to_process, features_all_classes, arg
             wbFits=[]
             smallScoreTensor=[]
             for MAV_no in set(assignments.cpu().tolist())-{-1}:
-                MAV = centroids[MAV_no,:].cuda()
-                f = features[assignments == MAV_no].cuda()
+                MAV = centroids[MAV_no,:].to(f"cuda:{gpu}")
+                f = features[assignments == MAV_no].to(f"cuda:{gpu}")
                 distances = pairwisedistances.__dict__[args.distance_metric](f, MAV[None,:])
+                if distances.shape[0] <= 5:
+                    continue
                 weibull_model = fit_high(distances.T, distance_multiplier, tailsize)
                 MAVs.append(MAV)
                 wbFits.append(weibull_model.wbFits)
                 smallScoreTensor.append(weibull_model.smallScoreTensor)
+            if len(wbFits)==0:
+                continue
             wbFits=torch.cat(wbFits)
             MAVs=torch.stack(MAVs)
             smallScoreTensor=torch.cat(smallScoreTensor)
@@ -64,7 +68,7 @@ def MultiModalOpenMax_Inference(pos_classes_to_process, features_all_classes, ar
         probs=[]
         for cls_no, cls_name in enumerate(sorted(models.keys())):
             distances = pairwisedistances.__dict__[args.distance_metric](test_cls_feature,
-                                                                         models[cls_name]['MAVs'].cuda().double())
+                                                                         models[cls_name]['MAVs'].to(f"cuda:{gpu}").double())
             probs_current_class = 1-models[cls_name]['weibulls'].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
         probs = torch.stack(probs,dim=-1).cpu()
