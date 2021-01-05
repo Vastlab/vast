@@ -1,0 +1,6 @@
+h5py
+numpy
+matplotlib
+torch
+torchvision
+termcolor
