@@ -17,6 +17,5 @@ class EVM_activation():
             distances = pairwisedistances.__dict__[self.distance_metric](features,
                                                                          self.models[cls_name]['extreme_vectors'].cuda())
             probs_current_class = self.models[cls_name]['weibulls'].wscore(distances)
-            print(torch.max(probs_current_class, dim=1).values)
             probs[:,cls_no] = torch.max(probs_current_class, dim=1).values
         return probs
