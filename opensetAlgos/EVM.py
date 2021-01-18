@@ -113,7 +113,9 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
         bottom_k_distances = []
         negative_distances=[]
         for batch_no, neg_features in enumerate(negative_classes_for_current_class):
-            assert positive_cls_feature.shape[0] != 0 and neg_features.shape[0] != 0
+            assert positive_cls_feature.shape[0] != 0 and neg_features.shape[0] != 0, \
+                f"Empty tensor encountered positive_cls_feature {positive_cls_feature.shape}" \
+                f"neg_features {neg_features.shape}"
             distances = pairwisedistances.__dict__[args.distance_metric](positive_cls_feature,
                                                                          neg_features.to(f"cuda:{gpu}"))
             bottom_k_distances.append(distances.cpu())
