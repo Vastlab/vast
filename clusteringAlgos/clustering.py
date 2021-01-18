@@ -1,10 +1,7 @@
 import sys
-from .FINCH.python.finch import FINCH
-
 import torch
 import numpy as np
 import time
-from sklearn.cluster import DBSCAN
 from ..tools import pairwisedistances
 
 def KMeans(x, K=450, verbose=True, init=None, seed=9, *args_passed, **kargs):
@@ -128,6 +125,7 @@ def pykeops_KMeans(x, K=10, Niter=300, verbose=True, random_indx='first_k'):
 
 
 def dbscan(x, distance_metric, eps=0.3, min_samples=10, *args_passed, **kargs):
+    from sklearn.cluster import DBSCAN
     """
     x_i = LazyTensor(x[:, None, :])  # (Npoints, 1, D)
     x_j = LazyTensor(x[None, :, :])  # (1, Npoints, D)
@@ -146,6 +144,7 @@ def dbscan(x, distance_metric, eps=0.3, min_samples=10, *args_passed, **kargs):
     return centroids, torch.tensor(db.labels_) #,db.core_sample_indices_
 
 def finch(x, ind_of_interest=-1, *args_passed, **kargs):
+    from .FINCH.python.finch import FINCH
     c, num_clust, req_c = FINCH(x.cpu().numpy(),verbose=False)
     num_clust_obtained = num_clust[ind_of_interest]
     assignments_of_interest = torch.tensor(c[:,ind_of_interest]).type(torch.LongTensor).cuda()
