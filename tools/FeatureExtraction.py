@@ -41,35 +41,22 @@ class Model_Operations():
         _ = self.model(x)
         return dict(zip(self.layer_names,self.outputs))
 
-class ImageNetPytorch(Dataset):
-    def __init__(self, csv_file, images_path,
-                 debug=False, shuffle_samples=False,
-                 transform=[transforms.Resize(256),
-                            transforms.CenterCrop(224),
-                            transforms.ToTensor(),
-                            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                 std=[0.229, 0.224, 0.225])]
-                ):
-        with open(csv_file, 'r') as f:
-            self.files = [line.rstrip() for line in f if line != '']
-        if debug:
-            self.files = self.files[:1000]
-        self.files = sorted(self.files)
-        if '360' in csv_file:
-            images_path = images_path + '/ILSVRC_2010-360classes/'
-        else:
-            images_path = images_path + '/ILSVRC_2012/'
-        self.images_path = images_path
-        self.transform = transforms.Compose(transform)
 
-    def __len__(self):
-        return len(self.files)
-
+class dataset_labeler(torchvision.datasets.DatasetFolder):
     def __getitem__(self, index):
-        jpeg_path, _ = self.files[index].split(',')
-        img = Image.open(self.images_path+jpeg_path).convert('RGB')
-        x = self.transform(img)
-        return (x,jpeg_path.split("/")[-1], jpeg_path.split("/")[-2])
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: (class_name, file_name, tensor_data)
+        """
+        path, _ = self.samples[index]
+        sample = self.loader(path)
+        if self.transform is not None:
+            sample = self.transform(sample)
+        sample_info=path.split("/")
+        cls_name,file_name=sample_info[-2],sample_info[-1]
+        return cls_name, file_name, sample
 
 
 def main(args):
