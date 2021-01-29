@@ -3,15 +3,13 @@ import os
 import numpy as np
 import h5py
 import pathlib
+import itertools
 import multiprocessing as mp
+from tqdm import tqdm
 import torch
 import torchvision
-import torchvision.models as models
+from torchvision.datasets.folder import pil_loader
 import torchvision.transforms as transforms
-import torch.backends.cudnn as cudnn
-from torch.utils.data import Dataset
-from PIL import Image
-from tqdm import tqdm
 
 def deep_get(dict_obj, key):
     d = dict_obj
@@ -94,63 +92,59 @@ def main(args):
     model = model.to('cuda')
     modelObj = Model_Operations(model, args.layer_names)
 
+    dataset_to_extract=dataset_labeler(args.dataset_path, pil_loader,
+                                       extensions=('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm'),
+                                       transform=val_transforms)
+    data_loader = torch.utils.data.DataLoader(dataset_to_extract,
+                                              batch_size=args.batch_size,
+                                              shuffle=False,
+                                              num_workers=mp.cpu_count(),
+                                              pin_memory=False,
+                                              drop_last=False)
+    pbar = tqdm(total=len(dataset_to_extract.classes))
+    current_class = None
+    current_class_im_name = []
+    current_class_layer_outputs = []
+    for _ in args.layer_names:
+        current_class_layer_outputs.append([])
 
-    output_file_path = pathlib.Path(f"{args.output_path}/{args.arch}/")
-    output_file_path.mkdir(parents=True, exist_ok=False)
-    for file_name in ['imagenet_1000_train.csv','imagenet_1000_val.csv','imagenet_360.csv']:
-        if '360' in file_name:
-            pbar = tqdm(total=360)
-        else:
-            pbar = tqdm(total=1000)
-        data_loader = torch.utils.data.DataLoader(ImageNetPytorch(args.input_csv_path + file_name,
-                                                                  args.images_path),
-                                                  batch_size=args.batch_size,
-                                                  shuffle=False,
-                                                  num_workers=1*mp.cpu_count(),
-                                                  pin_memory=False)
-        current_class = None
-        current_class_im_name = []
-        current_class_layer_outputs = []
-        for _ in args.layer_names:
-            current_class_layer_outputs.append([])
+    hf = h5py.File(args.output_path, "w")
 
-        hf = h5py.File(f"{output_file_path}/{file_name.split('.csv')[0]}.hdf5", "w")
+    with torch.no_grad():
+        for i, (gt_class, img_name, images) in enumerate(data_loader):
+            images = images.cuda()
+            layer_outputs = modelObj(images)
+            for layer in layer_outputs:
+                layer_outputs[layer] = layer_outputs[layer].tolist()
+            # Process all samples in the current batch
+            for sample_no,(gt,im_name) in enumerate(zip(gt_class, img_name)):
+                if current_class is None: current_class=gt
+                if len(current_class_im_name)>0 and gt != current_class:
+                    g = hf.create_group(current_class)
+                    g.create_dataset('image_names', data=np.array(current_class_im_name, dtype=h5py.string_dtype(encoding='utf-8')))
+                    for layer_no, layer in enumerate(layer_outputs):
+                        g.create_dataset(layer, data=np.array(current_class_layer_outputs[layer_no]))
+                    pbar.update(1)
 
-        with torch.no_grad():
-            for i, (images, img_name, gt_class) in enumerate(data_loader):
-                images = images.cuda()
-                layer_outputs = modelObj(images)
-                for layer in layer_outputs:
-                    layer_outputs[layer] = layer_outputs[layer].tolist()
-                # Process all samples in the current batch
-                for sample_no,(gt,im_name) in enumerate(zip(gt_class, img_name)):
-                    if current_class is None: current_class=gt
-                    if len(current_class_im_name)>0 and gt != current_class:
-                        g = hf.create_group(current_class)
-                        g.create_dataset('image_names', data=np.array(current_class_im_name, dtype=h5py.string_dtype(encoding='utf-8')))
-                        for layer_no, layer in enumerate(layer_outputs):
-                            g.create_dataset(layer, data=np.array(current_class_layer_outputs[layer_no]))
-                        pbar.update(1)
+                    # Reset variables that hold data
+                    current_class = gt
+                    current_class_layer_outputs = []
+                    for _ in args.layer_names:
+                        current_class_layer_outputs.append([])
+                    current_class_im_name = []
 
-                        # Reset variables that hold data
-                        current_class = gt
-                        current_class_layer_outputs = []
-                        for _ in args.layer_names:
-                            current_class_layer_outputs.append([])
-                        current_class_im_name = []
-
-                    current_class_im_name.append(im_name)
-                    for i,layer in enumerate(layer_outputs):
-                        current_class_layer_outputs[i].append(layer_outputs[layer][sample_no])
-            if len(current_class_im_name) > 0:
-                g = hf.create_group(current_class)
-                g.create_dataset('image_names',
-                                 data=np.array(current_class_im_name, dtype=h5py.string_dtype(encoding='utf-8')))
-                for layer_no, layer in enumerate(layer_outputs):
-                    g.create_dataset(layer, data=np.array(current_class_layer_outputs[layer_no]))
-                pbar.update(1)
-        pbar.close()
-        hf.close()
+                current_class_im_name.append(im_name)
+                for i,layer in enumerate(layer_outputs):
+                    current_class_layer_outputs[i].append(layer_outputs[layer][sample_no])
+        if len(current_class_im_name) > 0:
+            g = hf.create_group(current_class)
+            g.create_dataset('image_names',
+                             data=np.array(current_class_im_name, dtype=h5py.string_dtype(encoding='utf-8')))
+            for layer_no, layer in enumerate(layer_outputs):
+                g.create_dataset(layer, data=np.array(current_class_layer_outputs[layer_no]))
+            pbar.update(1)
+    pbar.close()
+    hf.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -162,23 +156,12 @@ if __name__ == '__main__':
     parser.add_argument("--layer_names",
                         nargs="+",
                         help="Layer names to extract",
-                        default=["fc"])
-    parser.add_argument("--images-path", help="directory containing imagenet images",
-                        default="/net/ironman/scratch/datasets/ImageNet/", required=False)
-    parser.add_argument("--weights", help="network weights",
-                        default=None, required=False)
-    parser.add_argument("--input-csv-path", help="directory path containing imagenet csvs",
-                        default="/home/jschwan2/simclr-converter/", required=False)
+                        default=None)
+    parser.add_argument("--dataset-path", help="directory containing the dataset in DatasetFolder format",
+                        default="/scratch/datasets/ImageNet/ILSVRC_2012/train", required=False)
+    parser.add_argument("--weights", help="network weights", default=None, required=False)
     parser.add_argument("--output-path", help="output directory path", default="", required=True)
     parser.add_argument("--batch-size", help="Number of samples per forward pass", default=256, type=int)
     args = parser.parse_args()
 
-    """
-    pytorch_models = sorted(name for name in models.__dict__
-                            if name.islower() and not name.startswith("__")
-                            and callable(models.__dict__[name]))
-    for pm in pytorch_models:
-        if 'mnasnet' in pm:
-            args.arch = pm
-    """
     main(args)
