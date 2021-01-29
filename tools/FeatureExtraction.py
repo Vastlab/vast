@@ -10,6 +10,12 @@ import torch
 import torchvision
 from torchvision.datasets.folder import pil_loader
 import torchvision.transforms as transforms
+def get_last_layer_name(net):
+    module=list(net._modules.items())[-1]
+    if type(module[1])==torch.nn.modules.linear.Linear or \
+            type(module[1])==torch.nn.modules.pooling.AdaptiveAvgPool2d:
+        return module[0]
+    return f"{module[0]}:s:{get_last_layer_name(module[1])}"
 
 def deep_get(dict_obj, key):
     d = dict_obj
@@ -106,6 +112,10 @@ def main(args):
     print(model)
     print(f"######### Model Architecture for {args.arch} ##############\n\n")
 
+    if args.layer_names is None:
+        args.layer_names=[get_last_layer_name(model)]
+        print(f"############# Will be extracting layer {args.layer_names} #############")
+
     model.eval()
     model = model.to('cuda')
     modelObj = Model_Operations(model, args.layer_names)
@@ -165,10 +175,14 @@ def main(args):
     hf.close()
 
 if __name__ == '__main__':
+    pytorch_models = sorted(name for name in torchvision.models.__dict__
+                            if name.islower() and not name.startswith("__")
+                            and callable(torchvision.models.__dict__[name]))
+
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      description="This script extracts features from a specific layer for a pytorch model")
     parser.add_argument("--arch",
-                        default='resnet18',
+                        default='resnet18', choices=pytorch_models,
                         help="The architecture from which to extract layers. "
                              "Can be a model architecture already available in torchvision or a saved pytorch model.")
     parser.add_argument("--layer_names",
