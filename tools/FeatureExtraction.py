@@ -10,6 +10,14 @@ import torch
 import torchvision
 from torchvision.datasets.folder import pil_loader
 import torchvision.transforms as transforms
+try:
+    import timm
+    assert timm.__version__ == "0.3.2"
+    from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+    DeiT_support=True
+except:
+    DeiT_support=False
+
 def get_last_layer_name(net):
     module=list(net._modules.items())[-1]
     if type(module[1])==torch.nn.modules.linear.Linear or \
@@ -60,13 +68,22 @@ class dataset_labeler(torchvision.datasets.DatasetFolder):
 
 
 def main(args):
-    # cudnn.benchmark = True
-    # Data loading code
-    pytorch_models = sorted(name for name in models.__dict__
-                            if name.islower() and not name.startswith("__")
-                            and callable(models.__dict__[name]))
-    if args.arch in pytorch_models:
-        model = models.__dict__[args.arch](pretrained=True)
+    if args.DeiT_model is not None:
+        input_size=int(args.DeiT_model.split('_')[-1])
+        size = int((256 / 224) * input_size)
+        model = torch.hub.load('facebookresearch/deit:main', args.DeiT_model, pretrained=True)
+        val_transforms = transforms.Compose([transforms.Resize(size, interpolation=3),
+                                             transforms.CenterCrop(input_size),
+                                             transforms.ToTensor(),
+                                             transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD)])
+    else:
+        model = torchvision.models.__dict__[args.arch](pretrained=True)
+        val_transforms=transforms.Compose([transforms.Scale(256),
+                                           transforms.CenterCrop(224),
+                                           transforms.ToTensor(),
+                                           transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                std=[0.229, 0.224, 0.225])])
+
     # Currently only specific to MoCoV2
     if args.weights is not None:
         state_dict = torch.load(args.weights, map_location="cpu")['state_dict']
@@ -154,6 +171,14 @@ if __name__ == '__main__':
                         default='resnet18', choices=pytorch_models,
                         help="The architecture from which to extract layers. "
                              "Can be a model architecture already available in torchvision or a saved pytorch model.")
+    if DeiT_support:
+        parser.add_argument("--DeiT_model",
+                            default=None, choices=('deit_tiny_patch16_224', 'deit_small_patch16_224',
+                                                   'deit_base_patch16_224', 'deit_tiny_distilled_patch16_224',
+                                                   'deit_small_distilled_patch16_224', 'deit_base_distilled_patch16_224',
+                                                   'deit_base_patch16_384', 'deit_base_distilled_patch16_384'),
+                            help="DeiT model"
+                            )
     parser.add_argument("--layer_names",
                         nargs="+",
                         help="Layer names to extract",
