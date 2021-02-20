@@ -48,7 +48,7 @@ class weibull:
         """
         self.sign = -1
         maxval = data.max()
-        #flip the data around 
+        #flip the data around the max so the smallest points are just beyond the data but mirrors the distribution
         data = 2* maxval - data
         max_tailsize_in_1_chunk = 100000
         if tailSize <= max_tailsize_in_1_chunk:
