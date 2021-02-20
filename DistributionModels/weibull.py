@@ -40,7 +40,7 @@ class weibull:
         return to_return
 
 
-    # new mode that flips the data around the max and then does a fit low reject so that its effectively modeling just above the max . 
+    # TB's new mode that flips the data around the max and then does a fit low reject so that its effectively modeling just above the max . 
     def FitHighFlipped(self,data, tailSize, isSorted=False, gpu=0):
         """
         data --> 5000 weibulls on 0 dim
