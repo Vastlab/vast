@@ -2,7 +2,10 @@ import numpy as np
 import torch
 
 class weibull:
-    def __init__(self, saved_model=None):
+    def __init__(self, translateAmountTensor=1,saved_model=None):
+        self.smallScoreTensor = 0.0
+        self.reversed = False
+        self.translateAmountTensor = translateAmountTensor
         if saved_model:
             self.wbFits = torch.zeros(saved_model['Scale'].shape[0],2)
             self.wbFits[:, 1] = saved_model['Scale']
@@ -10,6 +13,7 @@ class weibull:
             self.sign = saved_model['signTensor']
             self._ = saved_model['translateAmountTensor']
             self.smallScoreTensor = saved_model['smallScoreTensor']
+            self.translateAmountTensor = saved_model['translateAmountTensor']            
         return
 
     def tocpu(self):
@@ -20,7 +24,7 @@ class weibull:
         return dict(Scale = self.wbFits[:, 1],
                     Shape = self.wbFits[:, 0],
                     signTensor = self.sign,
-                    translateAmountTensor = 1,
+                    translateAmountTensor = self.translateAmountTensor,
                     smallScoreTensor = self.smallScoreTensor)
 
 
@@ -38,6 +42,25 @@ class weibull:
             self.splits = tailSize//max_tailsize_in_1_chunk + 1
             to_return = self._weibullFilltingInBatches(data, tailSize, isSorted, gpu)
         return to_return
+
+
+    def FitLowReversed(self,data, tailSize, isSorted=False, gpu=0):
+        """
+        data --> 5000 weibulls on 0 dim
+             --> 10000 distances for each weibull on 1 dim
+        """
+        self.sign = -1
+        self.reversed = True        
+        max_tailsize_in_1_chunk = 100000
+        if tailSize <= max_tailsize_in_1_chunk:
+            self.splits = 1
+            to_return = self._weibullFitting(data, tailSize, isSorted, gpu)
+        else:
+            self.splits = tailSize//max_tailsize_in_1_chunk + 1
+            to_return = self._weibullFilltingInBatches(data, tailSize, isSorted, gpu)
+        return to_return
+
+
 
 
     # TB's new mode that flips the data around the max and then does a fit low reject so that its effectively modeling just above the max . 
@@ -84,27 +107,67 @@ class weibull:
         smallScoreTensor=self.smallScoreTensor
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
-        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
+            ## tb hack 
+        distances = distances + self.translateAmountTensor - smallScoreTensor.to(self.deviceName)[None,:]
+#        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
         weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName))
         distances = distances.clamp(min=0)
-        return weibulls.cdf(distances)
+        if(self.reversed):
+            return 1-weibulls.cdf(distances)
+        else:
+            return weibulls.cdf(distances)        
 
+
+        
+
+    def prob(self, distances):
+        """
+        This function can calculate raw probability scores from various weibulls for a given set of distances
+        :param distances: a 2-D tensor with the number of rows equal to number of samples and number of columns equal to number of weibulls
+        Or
+        a 1-D tensor with number of elements equal to number of test samples
+        :return:
+        """
+        self.deviceName = distances.device
+        scale_tensor = self.wbFits[:,1]
+        shape_tensor = self.wbFits[:, 0]
+        if self.sign == -1:
+            distances = -distances
+        if len(distances.shape)==1:
+            distances = distances.repeat(shape_tensor.shape[0],1)
+        smallScoreTensor=self.smallScoreTensor
+        if len(self.smallScoreTensor.shape)==2:
+            smallScoreTensor=self.smallScoreTensor[:,0]
+            ## tb hack 
+        distances = distances + self.translateAmountTensor - smallScoreTensor.to(self.deviceName)[None,:]
+#        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
+        weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName))
+        distances = distances.clamp(min=0)
+        return torch.exp(weibulls.log_prob(distances))
+    
 
     def _weibullFitting(self, dataTensor, tailSize, isSorted=False, gpu=0):
         self.deviceName = dataTensor.device
-        if isSorted:
-            sortedTensor = dataTensor
-        else:
-            if self.sign == -1:
-                dataTensor = -dataTensor
-            sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=True, sorted=True).values
+        if self.sign == -1:
+            dataTensor = -dataTensor
+
+#        if isSorted:
+#           could try to just pull top items but its complicated by
+#           sign and tesnor structor so for now just get topk 
+        sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=True,
+                                      sorted=True).values
 
         smallScoreTensor = sortedTensor[:, tailSize - 1].unsqueeze(1)
-        processedTensor = sortedTensor + 1 - smallScoreTensor
+        #tb hask to remove shift by small score, its not needed with proper use of translateAmountTensor
+#        smallScoreTensor = 0*smallScoreTensor;
+        processedTensor = sortedTensor + self.translateAmountTensor - smallScoreTensor
+# previously translateAmountTensor was hard coded at 1. (translateamount from libMR)        
+#        processedTensor = sortedTensor + 1 - smallScoreTensor        
         # Returned in the format [Shape,Scale]
+        self.smallScoreTensor = smallScoreTensor
         if self.splits == 1:
             self.wbFits = self._fit(processedTensor)
-            self.smallScoreTensor = smallScoreTensor
+            return self.wbFits,smallScoreTensor
         else:
             return self._fit(processedTensor),smallScoreTensor
 
