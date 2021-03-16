@@ -93,7 +93,6 @@ def plotter_2D(
         colors_with_repetition.extend(colors.tolist())
     colors_with_repetition.extend(colors.tolist()[:int(colors.shape[0] % len(set(labels.tolist())))])
     colors_with_repetition = np.array(colors_with_repetition)
-    print(colors_with_repetition.shape, len(set(labels.tolist())))
 
     plt.scatter(pos_features[:, 0], pos_features[:, 1], c=colors_with_repetition[labels.astype(np.int)],
                 edgecolors='none', s=0.5)
