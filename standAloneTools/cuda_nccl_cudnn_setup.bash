@@ -1,3 +1,8 @@
+#!/bin/bash
+
+RSYNCALIAS=$1
+ALTCP=${2:-adhamija}
+
 touninstall=(
     "*cublas*"
     "cuda*"
@@ -16,9 +21,9 @@ toinstall=(
 
 RED='\033[0;31m'
 NC='\033[0m' # No Color
-packages_path="/scratch/adhamija/cuda_packages/"
+packages_path="/scratch/"$ALTCP"/cuda_packages/"
 mkdir -p $packages_path
-rsync -zarvh adhamija@quicksilver.vast.uccs.edu:$packages_path $packages_path
+rsync -zarvh $RSYNCALIAS@quicksilver.vast.uccs.edu:$packages_path $packages_path
 cd $packages_path
 
 CUDA_UNINSTALLER=/usr/local/cuda/bin/cuda-uninstaller
