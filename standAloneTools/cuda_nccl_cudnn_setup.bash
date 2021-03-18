@@ -47,4 +47,7 @@ sh $cuda_install_file
 echo -e "${RED}Installing packages ${toinstall[@]}${NC}"
 dpkg -i "${toinstall[@]}"
 
+# Enable persistence mode after installation has completed.
+echo -e "${RED}Enabling persistence mode${NC}"
+nvidia-persistenced
 
