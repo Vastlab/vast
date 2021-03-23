@@ -49,5 +49,18 @@ dpkg -i "${toinstall[@]}"
 
 # Enable persistence mode after installation has completed.
 echo -e "${RED}Enabling persistence mode${NC}"
-nvidia-persistenced
+
+NVIDIAPATH=/usr/share/doc/NVIDIA_GLX-1.0/samples/
+tar -xf $NVIDIAPATH/nvidia-persistenced-init.tar.bz2 -C /tmp/
+mv /tmp/nvidia-persistenced-init $NVIDIAPATH
+sh $NVIDIAPATH/nvidia-persistenced-init/install.sh
+
+# Check if script installed succesfully
+if [ $? -eq 0 ]; then
+        echo "${RED}Persistence mode succesfully enabled.${NC}"
+else
+        echo "${RED}Persistence mode installation failed, reloading daemons${NC}"
+        systemctl daemon-reload
+        sh $NVIDIAPATH/nvidia-persistenced-init/install.sh
+fi
 
