@@ -5,6 +5,7 @@ class weibull:
     def __init__(self, translateAmountTensor=1,saved_model=None):
         self.smallScoreTensor = 0.0
         self.reversed = False
+        self.trimmed = False        
         self.translateAmountTensor = translateAmountTensor
         if saved_model:
             self.wbFits = torch.zeros(saved_model['Scale'].shape[0],2)
@@ -89,6 +90,14 @@ class weibull:
         return self._weibullFitting(data, tailSize, isSorted)
 
 
+    def FitHighTrimmed(self, data, tailSize, isSorted=False):
+        self.sign = 1
+        self.splits = 1
+        self.trimmed = True        
+        return self._weibullFitting(data, tailSize, isSorted)
+
+
+
     def wscore(self, distances):
         """
         This function can calculate scores from various weibulls for a given set of distances
@@ -107,6 +116,8 @@ class weibull:
         smallScoreTensor=self.smallScoreTensor
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
+        if(self.translateAmountTensor == 0):
+            smallScoreTensor=0* smallScoreTensor;
             ## tb hack 
         distances = distances + self.translateAmountTensor - smallScoreTensor.to(self.deviceName)[None,:]
 #        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
@@ -138,12 +149,15 @@ class weibull:
         smallScoreTensor=self.smallScoreTensor
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
+        if(self.translateAmountTensor ==0):
+            smallScoreTensor=0* smallScoreTensor;
             ## tb hack 
         distances = distances + self.translateAmountTensor - smallScoreTensor.to(self.deviceName)[None,:]
 #        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
         weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName))
         distances = distances.clamp(min=0)
         return torch.exp(weibulls.log_prob(distances))
+
     
 
     def _weibullFitting(self, dataTensor, tailSize, isSorted=False, gpu=0):
@@ -153,11 +167,20 @@ class weibull:
 
 #        if isSorted:
 #           could try to just pull top items but its complicated by
-#           sign and tesnor structor so for now just get topk 
-        sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=True,
-                                      sorted=True).values
+#           sign and tesnor structor so for now just get topk
 
+        if self.trimmed :
+            #need trimed tails from the other end of reversed
+            sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=False,
+                                      sorted=True).values
+            sortedTensor = torch.topk(sortedTensor, tailSize, dim=1, largest=True,
+                                      sorted=True).values                
+        else: 
+            sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=True,
+                                      sorted=True).values
         smallScoreTensor = sortedTensor[:, tailSize - 1].unsqueeze(1)
+        if(self.translateAmountTensor ==0):
+            smallScoreTensor=0* smallScoreTensor;
         #tb hask to remove shift by small score, its not needed with proper use of translateAmountTensor
 #        smallScoreTensor = 0*smallScoreTensor;
         processedTensor = sortedTensor + self.translateAmountTensor - smallScoreTensor
