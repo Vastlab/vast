@@ -85,7 +85,8 @@ class weibull:
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
         distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
-        weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName))
+        weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName),
+                                                       validate_args=False)
         distances = distances.clamp(min=0)
         return weibulls.cdf(distances)
 
