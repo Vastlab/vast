@@ -76,15 +76,33 @@ def main(args):
                             and callable(models.__dict__[name]))
     if args.arch in pytorch_models:
         model = models.__dict__[args.arch](pretrained=True)
-    # Currently only specific to MoCoV2
+
     if args.weights is not None:
         state_dict = torch.load(args.weights, map_location="cpu")['state_dict']
+
+        if args.saved_with_data_parallel:
+            new_state_dict = {}
+            for k in state_dict:
+                new_state_dict[k.replace('module.', '')] = state_dict[k]
+            state_dict = new_state_dict
+
+        if args.ignore_fc:
+            del state_dict['fc.weight']
+            del state_dict['fc.bias']
+
+        """
+        # specific to MoCoV2
         for k in list(state_dict.keys()):
             if k.startswith('module.encoder_q') and not k.startswith('module.encoder_q.fc'):
                 state_dict[k[len("module.encoder_q."):]] = state_dict[k]
             del state_dict[k]
+        """
+
         msg = model.load_state_dict(state_dict, strict=False)
-        print(f"msg {msg}")
+        print(f"\n\n\nmsg {msg}")
+
+        if len(msg.missing_keys)>0 or len(msg.unexpected_keys)>0:
+            temp = input("\nPlease confirm to continue or press Ctrl+C to exit\n")
 
     print(f"\n\n######### Model Architecture for {args.arch} ##############")
     print(model)
@@ -171,7 +189,18 @@ if __name__ == '__main__':
                         default="/home/jschwan2/simclr-converter/", required=False)
     parser.add_argument("--output-path", help="output directory path", default="", required=True)
     parser.add_argument("--batch-size", help="Number of samples per forward pass", default=256, type=int)
+    parser.add_argument("--saved-with-data-parallel", help="If you saved your model with data parallel set this flag",
+                        default=False, action="store_true")
+    parser.add_argument("--ignore-fc", help="""
+                                            Ignore FC layer useful only if number of classes in the loaded network 
+                                            is different from the standard network architecture and the layer being 
+                                            extracted is not the fc layer.
+                                            """,
+                        default=False, action="store_true")
     args = parser.parse_args()
+    if args.ignore_fc:
+        assert 'fc' not in args.layer_names, \
+                    f"OOPS! You have been stopped from doing something you might repent :P"
 
     """
     pytorch_models = sorted(name for name in models.__dict__
