@@ -93,7 +93,8 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
         positive_cls_feature = features_all_classes[pos_cls_name].to(f"cuda:{gpu}")
         tailsize = max(args.tailsize)
         if tailsize<=1:
-            tailsize = int(tailsize*positive_cls_feature.shape[0])
+            tailsize = tailsize*positive_cls_feature.shape[0]
+        tailsize=int(tailsize)
 
         negative_classes_for_current_class=[]
         temp = []
@@ -142,7 +143,7 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
             if org_tailsize <= 1:
                 tailsize = int(org_tailsize * positive_cls_feature.shape[0])
             else:
-                tailsize = org_tailsize
+                tailsize = int(org_tailsize)
             # Perform actual EVM training
             weibull_model = fit_low(bottom_k_distances, distance_multiplier, tailsize, gpu)
             extreme_vectors_models, extreme_vectors_indexes, covered_vectors = set_cover(weibull_model,

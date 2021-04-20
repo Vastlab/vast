@@ -4,7 +4,7 @@ import torch
 
 def accuracy(prediction, target):
   """Computes the classification accuracy of the classifier based on known samples only.
-  Any target that does not belong to a certain class (where its maximum value is not 1) is disregarded.
+  Any target that does not belong to a certain class (target is -1) is disregarded.
 
   Parameters:
 
@@ -62,3 +62,35 @@ def sphere(representation, target, sphere_radius = None):
 
 
   return torch.tensor((sum, total))
+
+
+def confidence(logits, target, negative_offset = 0.1):
+  """Measures the softmax confidence of the correct class for known samples,
+  and 1 + negative_offset - max(confidence) for unknown samples.
+
+  Parameters:
+
+    logits: the output of the network, must be logits
+
+    target: the vector of true classes; can be -1 for unknown samples
+
+  Returns a tensor with two entries:
+
+    confidence: the sum of the confidence values for the samples
+
+    total: The total number of considered samples
+  """
+
+  with torch.no_grad():
+    known = target >=0
+
+    pred = torch.nn.functional.softmax(logits, dim=1)
+#    import ipdb; ipdb.set_trace()
+
+    confidence = 0.
+    if torch.sum(known):
+      confidence += torch.sum(pred[known,target[known]])
+    if torch.sum(~known):
+      confidence += torch.sum(1. + negative_offset - torch.max(pred[~known], dim=1)[0])
+
+  return torch.tensor((confidence, len(logits)))

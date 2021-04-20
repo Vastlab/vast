@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 class weibull:
-    def __init__(self, translateAmountTensor=1,saved_model=None):
+    def __init__(self, saved_model=None,translateAmountTensor=1):
         self.smallScoreTensor = 0.0
         self.reversed = False
         self.trimmed = False        
@@ -116,12 +116,15 @@ class weibull:
         smallScoreTensor=self.smallScoreTensor
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
+
         if(self.translateAmountTensor == 0):
             smallScoreTensor=0* smallScoreTensor;
             ## tb hack 
         distances = distances + self.translateAmountTensor - smallScoreTensor.to(self.deviceName)[None,:]
 #        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
-        weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName))
+        weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName),
+                                                       validate_args=False)
+
         distances = distances.clamp(min=0)
         if(self.reversed):
             return 1-weibulls.cdf(distances)
