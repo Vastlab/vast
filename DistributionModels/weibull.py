@@ -2,19 +2,19 @@ import numpy as np
 import torch
 
 class weibull:
-    def __init__(self, saved_model=None,translateAmountTensor=1):
-        self.smallScoreTensor = 0.0
+    def __init__(self, saved_model=None,translate_amount_from_zero_for_stability=1):
         self.reversed = False
         self.trimmed = False        
-        self.translateAmountTensor = translateAmountTensor
+        self.translate_amount_from_zero_for_stability = translate_amount_from_zero_for_stability
+        self.smallScoreTensor = torch.tensor(0.0)
         if saved_model:
             self.wbFits = torch.zeros(saved_model['Scale'].shape[0],2)
             self.wbFits[:, 1] = saved_model['Scale']
             self.wbFits[:, 0] = saved_model['Shape']
             self.sign = saved_model['signTensor']
-            self._ = saved_model['translateAmountTensor']
+            self._ = saved_model['translate_amount_from_zero_for_stability']
             self.smallScoreTensor = saved_model['smallScoreTensor']
-            self.translateAmountTensor = saved_model['translateAmountTensor']            
+            self.translate_amount_from_zero_for_stability = saved_model['translate_amount_from_zero_for_stability']            
         return
 
     def tocpu(self):
@@ -25,7 +25,7 @@ class weibull:
         return dict(Scale = self.wbFits[:, 1],
                     Shape = self.wbFits[:, 0],
                     signTensor = self.sign,
-                    translateAmountTensor = self.translateAmountTensor,
+                    translate_amount_from_zero_for_stability = self.translate_amount_from_zero_for_stability,
                     smallScoreTensor = self.smallScoreTensor)
 
 
@@ -45,26 +45,21 @@ class weibull:
         return to_return
 
 
+    # fit low reversed  aka fitlow model   does a fit low but instead of having the wscore return the CDF, it returns 1-CDF.  This is not the same as fithigh since it uses the smallest data but then the wscore probability that score is less than the data fit and it is decreasing as it approaches the data..
+    
     def FitLowReversed(self,data, tailSize, isSorted=False, gpu=0):
         """
         data --> 5000 weibulls on 0 dim
              --> 10000 distances for each weibull on 1 dim
         """
-        self.sign = -1
+        to_return = FitLow(self,data, tailSize, isSorted, gpu)
         self.reversed = True        
-        max_tailsize_in_1_chunk = 100000
-        if tailSize <= max_tailsize_in_1_chunk:
-            self.splits = 1
-            to_return = self._weibullFitting(data, tailSize, isSorted, gpu)
-        else:
-            self.splits = tailSize//max_tailsize_in_1_chunk + 1
-            to_return = self._weibullFilltingInBatches(data, tailSize, isSorted, gpu)
         return to_return
 
 
 
 
-    # TB's new mode that flips the data around the max and then does a fit low reject so that its effectively modeling just above the max . 
+    # TB's new mode that flips the data around the max and then does a fit low reject so that its effectively modeling values just above the max . 
     def FitHighFlipped(self,data, tailSize, isSorted=False, gpu=0):
         """
         data --> 5000 weibulls on 0 dim
@@ -83,6 +78,15 @@ class weibull:
             to_return = self._weibullFilltingInBatches(data, tailSize, isSorted, gpu)
         return to_return
 
+       
+    #fit high but drop the tailsize top scores and fit high  all  the rest of the data. 
+    def FitHighTrimmed(self, data, tailSize, isSorted=False):
+        self.sign = 1
+        self.splits = 1
+        self.trimmed = True        
+        return self._weibullFitting(data, tailSize, isSorted)
+
+
 
     def FitHigh(self, data, tailSize, isSorted=False):
         self.sign = 1
@@ -90,11 +94,14 @@ class weibull:
         return self._weibullFitting(data, tailSize, isSorted)
 
 
-    def FitHighTrimmed(self, data, tailSize, isSorted=False):
+    # fit high reversed  aka fithigh model   does a fit high but instead of having the wscore return the CDF, it returns 1-CDF.  This is not the same as fitlow since it uses the largest data but then the wscore probability that score is less than the data fit and it is decreasing as it approaches the data. 
+
+    def FitHighReversed(self, data, tailSize, isSorted=False):
         self.sign = 1
         self.splits = 1
-        self.trimmed = True        
-        return self._weibullFitting(data, tailSize, isSorted)
+        rval = self._weibullFitting(data, tailSize, isSorted)
+        self.reversed = 1
+        return rval;
 
 
 
@@ -117,13 +124,11 @@ class weibull:
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
 
-        if(self.translateAmountTensor == 0):
+        if(self.translate_amount_from_zero_for_stability == 0):
             smallScoreTensor=0* smallScoreTensor;
-            ## tb hack 
-        distances = distances + self.translateAmountTensor - smallScoreTensor.to(self.deviceName)[None,:]
-#        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
+        distances = distances + self.translate_amount_from_zero_for_stability - smallScoreTensor.to(self.deviceName)[None,:]
         weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName),
-                                                       validate_args=False)
+                                                       validate_args=True)
 
         distances = distances.clamp(min=0)
         if(self.reversed):
@@ -152,11 +157,9 @@ class weibull:
         smallScoreTensor=self.smallScoreTensor
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
-        if(self.translateAmountTensor ==0):
+        if(self.translate_amount_from_zero_for_stability ==0):
             smallScoreTensor=0* smallScoreTensor;
-            ## tb hack 
-        distances = distances + self.translateAmountTensor - smallScoreTensor.to(self.deviceName)[None,:]
-#        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None,:]
+        distances = distances + self.translate_amount_from_zero_for_stability - smallScoreTensor.to(self.deviceName)[None,:]
         weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName))
         distances = distances.clamp(min=0)
         return torch.exp(weibulls.log_prob(distances))
@@ -168,10 +171,6 @@ class weibull:
         if self.sign == -1:
             dataTensor = -dataTensor
 
-#        if isSorted:
-#           could try to just pull top items but its complicated by
-#           sign and tesnor structor so for now just get topk
-
         if self.trimmed :
             #need trimed tails from the other end of reversed
             sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=False,
@@ -182,12 +181,8 @@ class weibull:
             sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=True,
                                       sorted=True).values
         smallScoreTensor = sortedTensor[:, tailSize - 1].unsqueeze(1)
-        if(self.translateAmountTensor ==0):
-            smallScoreTensor=0* smallScoreTensor;
-        #tb hask to remove shift by small score, its not needed with proper use of translateAmountTensor
-#        smallScoreTensor = 0*smallScoreTensor;
-        processedTensor = sortedTensor + self.translateAmountTensor - smallScoreTensor
-# previously translateAmountTensor was hard coded at 1. (translateamount from libMR)        
+        processedTensor = sortedTensor + self.translate_amount_from_zero_for_stability - smallScoreTensor
+# previously translate_amount_from_zero_for_stability was hard coded at 1. (translateamount from libMR)        
 #        processedTensor = sortedTensor + 1 - smallScoreTensor        
         # Returned in the format [Shape,Scale]
         self.smallScoreTensor = smallScoreTensor
