@@ -1,10 +1,11 @@
 import numpy as np
 import torch
+import pdb
 
 class weibull:
     def __init__(self, saved_model=None,translate_amount_from_zero_for_stability=1):
         self.reversed = False
-        self.trimmed = False        
+        self.to_trim = 0
         self.translate_amount_from_zero_for_stability = translate_amount_from_zero_for_stability
         self.smallScoreTensor = torch.tensor(0.0)
         if saved_model:
@@ -79,12 +80,18 @@ class weibull:
         return to_return
 
        
-    #fit high but drop the tailsize top scores and fit high  all  the rest of the data. 
-    def FitHighTrimmed(self, data, tailSize, isSorted=False):
+    #fit high if trimboth >0, it s the number of items to trim and tailsize is used for for fitting.  For compatabiliwth with first version use in FACTO if  trimboth=0 (or not supplied),, then tailsize is the number items to keep (from smallest)  and trim off all above it.  
+    def FitHighTrimmed(self, data, tailsize, isSorted=False, trimboth=0):
         self.sign = 1
         self.splits = 1
-        self.trimmed = True        
-        return self._weibullFitting(data, tailSize, isSorted)
+#        pdb.set_trace()
+        if(trimboth>0):
+            self.to_trim = trimboth;
+        else: 
+            length = list(data.size())[1]
+            self.to_trim = length-tailsize;
+
+        return self._weibullFitting(data, tailsize, isSorted)
 
 
 
@@ -124,11 +131,12 @@ class weibull:
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
 
+        #if translate_amount_from_zero is zero, then we don't use a smallScoreTensor.. (i.e. no shift) and do this as 2 -arm weibull
         if(self.translate_amount_from_zero_for_stability == 0):
             smallScoreTensor=0* smallScoreTensor;
         distances = distances + self.translate_amount_from_zero_for_stability - smallScoreTensor.to(self.deviceName)[None,:]
         weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName),
-                                                       validate_args=True)
+                                                       validate_args=False)
 
         distances = distances.clamp(min=0)
         if(self.reversed):
@@ -157,11 +165,12 @@ class weibull:
         smallScoreTensor=self.smallScoreTensor
         if len(self.smallScoreTensor.shape)==2:
             smallScoreTensor=self.smallScoreTensor[:,0]
+        #if translate_amount_from_zero is zero, then we don't use a smallScoreTensor.. (i.e. no shift) and do this as 2 -arm weibull
         if(self.translate_amount_from_zero_for_stability ==0):
             smallScoreTensor=0* smallScoreTensor;
         distances = distances + self.translate_amount_from_zero_for_stability - smallScoreTensor.to(self.deviceName)[None,:]
         weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName))
-        distances = distances.clamp(min=0)
+        distances = distances.clamp(min=.00000001)  #clamp to avoid blowup and range issues
         return torch.exp(weibulls.log_prob(distances))
 
     
@@ -170,17 +179,23 @@ class weibull:
         self.deviceName = dataTensor.device
         if self.sign == -1:
             dataTensor = -dataTensor
-
-        if self.trimmed :
-            #need trimed tails from the other end of reversed
-            sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=False,
-                                      sorted=True).values
-            sortedTensor = torch.topk(sortedTensor, tailSize, dim=1, largest=True,
-                                      sorted=True).values                
+        
+        if self.to_trim >0 :
+#            pdb.set_trace()
+            len = list(dataTensor.size())[1]
+            tsize = min(self.to_trim + tailSize,len);
+            #need trimed tail by getting enough data for drop + tailize then  we timmed items by keeping smaller values
+            sortedTensor = torch.topk(dataTensor, tsize, dim=1, largest=True, sorted=True).values
+            sortedTensor = torch.topk(sortedTensor, tailSize, dim=1, largest=False, sorted=True).values
+            smallScoreTensor = sortedTensor[:, 0].unsqueeze(1)            
         else: 
-            sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=True,
-                                      sorted=True).values
-        smallScoreTensor = sortedTensor[:, tailSize - 1].unsqueeze(1)
+            sortedTensor = torch.topk(dataTensor, tailSize, dim=1, largest=True, sorted=True).values
+            smallScoreTensor = sortedTensor[:, tailSize - 1].unsqueeze(1)
+
+        #if translate_amount_from_zero is zero, then we don't use a smallScoreTensor.. (i.e. no shift) and do this as 2 -arm weibull
+        if(self.translate_amount_from_zero_for_stability ==0):
+            smallScoreTensor=0* smallScoreTensor;            
+
         processedTensor = sortedTensor + self.translate_amount_from_zero_for_stability - smallScoreTensor
 # previously translate_amount_from_zero_for_stability was hard coded at 1. (translateamount from libMR)        
 #        processedTensor = sortedTensor + 1 - smallScoreTensor        
@@ -199,6 +214,7 @@ class weibull:
         batchSize = int(np.ceil(N / self.splits))
         resultTensor = torch.zeros(size=(N,2), dtype=dtype)
         reultTensor_smallScoreTensor = torch.zeros(size=(N,1), dtype=dtype)
+            
         for batchIter in range(int(self.splits-1)):
           startIndex = batchIter*batchSize
           endIndex = startIndex + batchSize
@@ -251,7 +267,10 @@ class weibull:
             f_prime = (ff_prime / fg - (ff_by_fg**2)) + (1. / (k * k))
             del ff_prime, fg
             # Newton-Raphson method k = k - f(k;x)/f'(k;x)
+            lastk = k
             k -= f / f_prime
+            if(torch.isnan(k)):
+                pdb.set_trace()
             computed_params[not_completed*torch.isnan(f),:] = torch.tensor([float('nan'),float('nan')]).double().to(self.deviceName)
             not_completed[abs(k - k_t_1) < eps] = False
             computed_params[torch.logical_not(not_completed),0] = k[torch.logical_not(not_completed)]
