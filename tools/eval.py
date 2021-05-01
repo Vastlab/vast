@@ -1,10 +1,11 @@
 import torch
-from . import tools
+from .__init__ import device,set_device_cpu
+set_device_cpu()
 
-def tensor_OSRC(gt, predicted_class, score):
+def common_processing(gt, predicted_class, score):
     if len(score.shape)!=1:
         score = score[:,0]
-    score = tools.device(score)
+    score = device(score)
     score, indices = torch.sort(score, descending=True)
     indices = indices.cpu()
     predicted_class, gt = predicted_class[indices], gt[indices]
@@ -18,8 +19,12 @@ def tensor_OSRC(gt, predicted_class, score):
     indx = torch.arange(unique_scores_reversed.shape[0]-1,-1,-1)
     unique_scores , counts = unique_scores_reversed[indx], counts_reversed[indx]
     del unique_scores_reversed, counts_reversed
+    threshold_indices = torch.cumsum(counts,dim=-1)-1
+    return gt, predicted_class, score, unique_scores, threshold_indices
 
-    gt = tools.device(gt)
+def tensor_OSRC(gt, predicted_class, score):
+    gt, predicted_class, score, unique_scores, threshold_indices = common_processing(gt, predicted_class, score)
+    gt = device(gt)
     # Get the labels for unknowns
     unknown_labels = set(torch.flatten(gt).tolist())-set(torch.flatten(predicted_class).tolist())
 
@@ -40,11 +45,21 @@ def tensor_OSRC(gt, predicted_class, score):
     OSE = all_unknowns/no_of_unknowns
 
     correct = torch.any(gt[:,None].cpu()==predicted_class, dim=1)
-    correct = tools.device(correct)
+    correct = device(correct)
     correct = torch.cumsum(correct,dim=-1).type('torch.FloatTensor')
 
     knowns_accuracy = correct / no_of_knowns
-    threshold_indices = torch.cumsum(counts,dim=-1)-1
-    knowns_accuracy, OSE = knowns_accuracy[threshold_indices], OSE[threshold_indices]
-    
-    return (knowns_accuracy,OSE)
+    current_converage = torch.cumsum(known_indexs, dim=0)/no_of_knowns
+    knowns_accuracy, current_converage, OSE = knowns_accuracy[threshold_indices],\
+                                              current_converage[threshold_indices],\
+                                              OSE[threshold_indices]
+    return (OSE, knowns_accuracy, current_converage)
+
+
+def coverage(gt, predicted_class, score):
+    gt, predicted_class, score, unique_scores, threshold_indices = common_processing(gt, predicted_class, score)
+    correct = torch.any(gt[:,None].cpu()==predicted_class, dim=1)
+    correct = torch.cumsum(correct,dim=-1).type('torch.FloatTensor')
+    acc = correct[threshold_indices]/gt.shape[0]
+    current_converage = (threshold_indices + 1)/gt.shape[0]
+    return unique_scores, acc, current_converage
