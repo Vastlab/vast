@@ -8,8 +8,19 @@ import multiprocessing as mp
 from tqdm import tqdm
 import torch
 import torchvision
+try:
+    # https://github.com/pytorch/accimage
+    torchvision.set_image_backend('accimage')
+except:
+    pass
 from torchvision.datasets.folder import pil_loader
 import torchvision.transforms as transforms
+from vast.tools import logger as vastlogger
+try:
+    from pl_bolts.models import self_supervised
+    pl_bolts=True
+except:
+    pl_bolts=False
 try:
     import timm
     assert timm.__version__ == "0.3.2"
@@ -18,6 +29,12 @@ try:
 except:
     DeiT_support=False
 
+ss_models_mapping={
+    "SimCLR":{"url":"https://pl-bolts-weights.s3.us-east-2.amazonaws.com/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt",
+              "transform":self_supervised.simclr.transforms.SimCLREvalDataTransform().online_transform},
+    # "SwAV":{"url":"https://pl-bolts-weights.s3.us-east-2.amazonaws.com/swav/swav_imagenet/swav_imagenet.pth.tar",
+    #         "transform"}
+}
 def get_last_layer_name(net):
     module=list(net._modules.items())[-1]
     if type(module[1])==torch.nn.modules.linear.Linear or \
@@ -66,9 +83,15 @@ class dataset_labeler(torchvision.datasets.DatasetFolder):
         cls_name,file_name=sample_info[-2],sample_info[-1]
         return cls_name, file_name, sample
 
-
 def main(args):
-    if args.DeiT_model is not None:
+    logger = vastlogger.setup_logger(level=args.verbose)
+
+    if args.self_supervised_approach is not None:
+        logger.critical(f"Loding model from {ss_models_mapping[args.self_supervised_approach]['url']}")
+        model = self_supervised.__dict__[args.self_supervised_approach].load_from_checkpoint(
+                                    ss_models_mapping[args.self_supervised_approach]['url'], strict=False).encoder
+        val_transforms = ss_models_mapping[args.self_supervised_approach]['transform']
+    elif args.DeiT_model is not None:
         input_size=int(args.DeiT_model.split('_')[-1])
         size = int((256 / 224) * input_size)
         model = torch.hub.load('facebookresearch/deit:main', args.DeiT_model, pretrained=True)
@@ -106,18 +129,18 @@ def main(args):
         """
 
         msg = model.load_state_dict(state_dict, strict=False)
-        print(f"\n\n\nmsg {msg}")
+        logger.critical(f"\n\n\nmsg {msg}")
 
         if len(msg.missing_keys)>0 or len(msg.unexpected_keys)>0:
             temp = input("\nPlease confirm to continue or press Ctrl+C to exit\n")
 
-    print(f"\n\n######### Model Architecture for {args.arch} ##############")
-    print(model)
-    print(f"######### Model Architecture for {args.arch} ##############\n\n")
+    logger.info(f"\n\n######### Model Architecture for {args.arch} ##############")
+    logger.info(model)
+    logger.info(f"######### Model Architecture for {args.arch} ##############\n\n")
 
     if args.layer_names is None:
         args.layer_names=[get_last_layer_name(model)]
-        print(f"############# Will be extracting layer {args.layer_names} #############")
+    logger.critical(f"############# Will be extracting layer {args.layer_names} #############")
 
     model.eval()
     model = model.to('cuda')
@@ -129,7 +152,7 @@ def main(args):
     data_loader = torch.utils.data.DataLoader(dataset_to_extract,
                                               batch_size=args.batch_size,
                                               shuffle=False,
-                                              num_workers=mp.cpu_count(),
+                                              num_workers=mp.cpu_count()//10,
                                               pin_memory=False,
                                               drop_last=False)
     pbar = tqdm(total=len(dataset_to_extract.classes))
@@ -184,8 +207,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      description="This script extracts features from a specific layer for a pytorch model")
+    parser.add_argument('-v', '--verbose', help="To decrease verbosity increase", action='count', default=2)
     parser.add_argument("--arch",
-                        default='resnet18', choices=pytorch_models,
+                        default=None, choices=pytorch_models,
                         help="The architecture from which to extract layers. "
                              "Can be a model architecture already available in torchvision or a saved pytorch model.")
     if DeiT_support:
@@ -195,6 +219,13 @@ if __name__ == '__main__':
                                                    'deit_small_distilled_patch16_224', 'deit_base_distilled_patch16_224',
                                                    'deit_base_patch16_384', 'deit_base_distilled_patch16_384'),
                             help="DeiT model"
+                            )
+    if pl_bolts:
+        self_supervised_approaches = sorted(name for name in self_supervised.__dict__
+                                            if not name.startswith("__") and callable(self_supervised.__dict__[name]))
+        parser.add_argument("--self_supervised_approach",
+                            default=None, choices=self_supervised_approaches,
+                            help="Self-supervised based model to load from pytorch lightning"
                             )
     parser.add_argument("--layer_names",
                         nargs="+",
@@ -218,4 +249,8 @@ if __name__ == '__main__':
         assert 'fc' not in args.layer_names, \
                     f"OOPS! You have been stopped from doing something you might repent :P"
 
+    if not pl_bolts:
+        args.self_supervised_approach=None
+    if not DeiT_support:
+        args.DeiT_model=None
     main(args)
