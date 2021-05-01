@@ -152,7 +152,7 @@ def main(args):
     data_loader = torch.utils.data.DataLoader(dataset_to_extract,
                                               batch_size=args.batch_size,
                                               shuffle=False,
-                                              num_workers=mp.cpu_count()//10,
+                                              num_workers=min(mp.cpu_count()//10, 1),
                                               pin_memory=False,
                                               drop_last=False)
     pbar = tqdm(total=len(dataset_to_extract.classes))
