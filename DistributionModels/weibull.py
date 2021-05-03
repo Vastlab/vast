@@ -46,16 +46,18 @@ class weibull:
         return to_return
 
 
-    # fit low reversed  aka fitlow model   does a fit low but instead of having the wscore return the CDF, it returns 1-CDF.  This is not the same as fithigh since it uses the smallest data but then the wscore probability that score is less than the data fit and it is decreasing as it approaches the data..
+
+        # fit low reversed  aka fitlow model   does a fit low but instead of having the wscore return the CDF, it returns 1-CDF.  This is not the same as fithigh since it uses the smallest data but then the wscore probability that score is less than the data fit and it is decreasing as it approaches the data..
     
     def FitLowReversed(self,data, tailSize, isSorted=False, gpu=0):
         """
         data --> 5000 weibulls on 0 dim
              --> 10000 distances for each weibull on 1 dim
         """
-        to_return = FitLow(self,data, tailSize, isSorted, gpu)
+        to_return = self.FitLow(data, tailSize, isSorted, gpu)
         self.reversed = True        
         return to_return
+
 
 
 
@@ -92,6 +94,40 @@ class weibull:
             self.to_trim = length-tailsize;
 
         return self._weibullFitting(data, tailsize, isSorted)
+
+    #Do meta recogntion (drop top scores, fit, get predicted probabilties). 
+    def MetaRecognition_High(self, data, tailsize, dropsize=1):
+        wbls = self.FitHighTrimmed(data,tailsize,False,dropsize)
+        distances = torch.topk(data, 1, dim=1, largest=True, sorted=True).values
+        #canot just use wscore code since it will do each wibeul for each distance  we want only matched distance and weibull
+
+        self.deviceName = distances.device
+        scale_tensor = self.wbFits[:,1]
+        shape_tensor = self.wbFits[:, 0]
+        pdb.set_trace()
+        if self.sign == -1:
+            distances = -distances
+        if len(distances.shape)==1:
+            distances = distances.repeat(shape_tensor.shape[0],1)
+        smallScoreTensor=self.smallScoreTensor
+#         if len(self.smallScoreTensor.shape)==2:
+#             smallScoreTensor=self.smallScoreTensor[:,0]
+# 
+        #if translate_amount_from_zero is zero, then we don't use a smallScoreTensor.. (i.e. no shift) and do this as 2 -arm weibull
+        if(self.translate_amount_from_zero_for_stability == 0):
+            smallScoreTensor=0* smallScoreTensor;
+        distances = distances + self.translate_amount_from_zero_for_stability - smallScoreTensor.to(self.deviceName)[None,:]
+        distances = distances.clamp(min=0)
+        distances =   distances.reshape(shape_tensor.shape[0])
+        weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName),
+                                                       validate_args=False)
+
+        wscores = None
+        if(self.reversed):
+            wscores = 1-weibulls.cdf(distances)
+        else:
+            wscores =  weibulls.cdf(distances)        
+        return wscores,wbls
 
 
 
@@ -169,8 +205,8 @@ class weibull:
         if(self.translate_amount_from_zero_for_stability ==0):
             smallScoreTensor=0* smallScoreTensor;
         distances = distances + self.translate_amount_from_zero_for_stability - smallScoreTensor.to(self.deviceName)[None,:]
-        weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName))
         distances = distances.clamp(min=.00000001)  #clamp to avoid blowup and range issues
+        weibulls = torch.distributions.weibull.Weibull(scale_tensor.to(self.deviceName),shape_tensor.to(self.deviceName),validate_args=True)
         return torch.exp(weibulls.log_prob(distances))
 
     
@@ -200,6 +236,7 @@ class weibull:
 # previously translate_amount_from_zero_for_stability was hard coded at 1. (translateamount from libMR)        
 #        processedTensor = sortedTensor + 1 - smallScoreTensor        
         # Returned in the format [Shape,Scale]
+        processedTensor = processedTensor.clamp(min=.00000001)  #clamp to avoid blowup and range issues        
         self.smallScoreTensor = smallScoreTensor
         if self.splits == 1:
             self.wbFits = self._fit(processedTensor)
@@ -269,8 +306,6 @@ class weibull:
             # Newton-Raphson method k = k - f(k;x)/f'(k;x)
             lastk = k
             k -= f / f_prime
-            if(torch.isnan(k)):
-                pdb.set_trace()
             computed_params[not_completed*torch.isnan(f),:] = torch.tensor([float('nan'),float('nan')]).double().to(self.deviceName)
             not_completed[abs(k - k_t_1) < eps] = False
             computed_params[torch.logical_not(not_completed),0] = k[torch.logical_not(not_completed)]
