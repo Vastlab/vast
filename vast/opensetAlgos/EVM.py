@@ -244,7 +244,7 @@ class EVM_Inference_simple_cpu:
         combined_extreme_vectors=[]
 
         for cls_no, cls_name in enumerate(sorted(models.keys())):
-            models[cls_name]['weibulls'].to_cpu()
+            models[cls_name]['weibulls'].tocpu()
             weibull_params_current_cls = models[cls_name]['weibulls'].return_all_parameters()
             combined_weibull_model['Scale'].extend(weibull_params_current_cls['Scale'].tolist())
             combined_weibull_model['Shape'].extend(weibull_params_current_cls['Shape'].tolist())
@@ -259,7 +259,7 @@ class EVM_Inference_simple_cpu:
         combined_extreme_vectors=torch.tensor(combined_extreme_vectors, dtype=torch.float64)
 
         self.combined_model={}
-        self.combined_model['weibulls'] = weibull.Weibull(combined_weibull_model)
+        self.combined_model['weibulls'] = weibull.weibull(combined_weibull_model)
         self.combined_model['extreme_vectors'] = combined_extreme_vectors
         
         self.distance_metric = distance_metric
