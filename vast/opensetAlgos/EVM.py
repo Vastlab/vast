@@ -265,7 +265,7 @@ class EVM_Inference_simple_cpu:
         self.distance_metric = distance_metric
         
     def __call__(self, sample_to_process):
-        distances = pairwisedistances.__dict__[self.distance_metric](sample_to_process,
+        distances = pairwisedistances.__dict__[self.distance_metric](sample_to_process[None,:],
                                                                      self.combined_model['extreme_vectors'])
         probs = torch.max(self.combined_model['weibulls'].wscore(distances), dim=1).values
         return probs
