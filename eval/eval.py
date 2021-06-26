@@ -87,3 +87,53 @@ def coverage(gt, predicted_class, score, knownness_score=None):
     acc = correct[threshold_indices]/gt.shape[0]
     current_converage = (threshold_indices + 1)/gt.shape[0]
     return unique_scores, acc, current_converage
+
+
+def calculate_binary_precision_recall(gt, predicted_class, score):
+    """
+    This function measures the performance of an algorithm to identify a known as a known while
+    the unknowns only impact as false positives in the precision
+    :param gt:
+    :param predicted_class:
+    :param score:
+    :return:
+    """
+    gt, predicted_class, score, unique_scores, threshold_indices = common_processing(gt, predicted_class, score)
+
+    known_indexs, unknown_indexs = get_known_unknown_indx(gt, predicted_class)
+
+    no_of_knowns = known_indexs.sum().type('torch.FloatTensor')
+    no_of_unknowns = unknown_indexs.sum().type('torch.FloatTensor')
+
+    all_knowns = torch.cumsum(known_indexs,dim=-1).type('torch.FloatTensor')
+    all_unknowns = torch.cumsum(unknown_indexs,dim=-1).type('torch.FloatTensor')
+    all_knowns, all_unknowns = all_knowns[threshold_indices], all_unknowns[threshold_indices]
+
+    Recall = all_knowns / no_of_knowns
+    # Precision here is non monotonic
+    Precision = all_knowns / (all_knowns + all_unknowns)
+
+    Recall = [0.] + Recall.tolist() + [1.]
+    Precision = [0.] + Precision.tolist() + [0.]
+
+    # make precision monotonic
+    for index_ in range(len(Precision) - 1, 0, -1):
+        Precision[index_ - 1] = max(Precision[index_ - 1], Precision[index_])
+
+    Recall = torch.tensor(Recall)
+    Precision = torch.tensor(Precision)
+    unique_scores = [torch.max(unique_scores).item()] + unique_scores.tolist() + [torch.min(unique_scores).item()]
+
+    return Precision, Recall, unique_scores
+
+def F_score(Precision, Recall, ß=1.):
+    """
+    Calculates F Score by the following equation, default is F1 score because ß = 1.0
+    F_Score = (1+ß**2)*((Precision * Recall) / ((ß**2)*Precision + Recall))
+    :param Precision:
+    :param Recall:
+    :param ß:
+    :return:
+    """
+    FScore = (1+ß**2)*((Precision * Recall) / ((ß**2)*Precision + Recall))
+    return FScore
