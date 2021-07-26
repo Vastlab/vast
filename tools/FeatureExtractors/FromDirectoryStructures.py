@@ -108,7 +108,9 @@ def main(args):
                                                                 std=[0.229, 0.224, 0.225])])
 
     if args.weights is not None:
-        state_dict = torch.load(args.weights, map_location="cpu")['state_dict']
+        state_dict = torch.load(args.weights, map_location="cpu")
+        if 'state_dict' in state_dict:
+            state_dict = state_dict['state_dict']
 
         if args.saved_with_data_parallel:
             new_state_dict = {}
@@ -129,7 +131,7 @@ def main(args):
         """
 
         msg = model.load_state_dict(state_dict, strict=False)
-        logger.critical(f"\n\n\nmsg {msg}")
+        logger.critical(f"\n\n\nMessage from model loading\n{msg}")
 
         if len(msg.missing_keys)>0 or len(msg.unexpected_keys)>0:
             temp = input("\nPlease confirm to continue or press Ctrl+C to exit\n")
