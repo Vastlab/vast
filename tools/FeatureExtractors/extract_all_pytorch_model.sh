@@ -3,7 +3,7 @@ architectures=('alexnet' 'densenet121' 'densenet161' 'densenet169' 'densenet201'
 dataset_types=('val_in_folders')
 datasets=('ILSVRC_2012' '360_openset')
 dataset_root="/scratch/datasets/ImageNet"
-output_dir="/net/reddwarf/bigscratch/adhamija/Features/"
+output_dir="/net/reddwarf/bigscratch/adhamija/The/Features/$0"
 no_of_gpus=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
 all_running_PIDS=()
 exp_no=0
@@ -17,8 +17,8 @@ for architecture in "${architectures[@]}"; do
       output_file_path="${output_dir_path}/${dataset_type}.hdf5"
       images_path="${dataset_root}/${dataset}/${dataset_type}"
       set -o xtrace
-      PID=$(nohup sh -c "CUDA_VISIBLE_DEVICES=$exp_no python FeatureExtraction.py --arch $architecture \
-      --output-path $output_file_path --dataset-path $images_path" >/dev/null 2>&1 & echo $!)
+      PID=$(nohup sh -c "CUDA_VISIBLE_DEVICES=$exp_no python FromDirectoryStructures.py --arch $architecture \
+      --output-path $output_file_path --dataset-path $images_path --dare-devil" >/dev/null 2>&1 & echo $!)
       set +o xtrace
       echo "Started PID $PID"
       all_running_PIDS[$exp_no]=$PID
