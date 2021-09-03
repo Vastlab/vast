@@ -24,7 +24,7 @@ def openmax_alpha(activations, evt_probs, alpha=1):
     weights = torch.ones(activations.shape[1])
     weights[:alpha] = torch.arange(1, alpha+1, step=1)
     weights[:alpha] = (alpha-weights[:alpha])/alpha
-    weights = 1-(weights[None,:]*evt_probs)
+    weights = 1-(weights[None,:]*torch.gather(evt_probs, 1, indices))
     revisted_activations = sorted_activations * weights
     unknowness_class_prob = torch.sum(sorted_activations * (1-weights), dim=1)
     revisted_activations = torch.gather(revisted_activations, 1, indices)
