@@ -2,7 +2,7 @@ import torch
 from torch.nn import functional as F
 
 
-def openmax_alpha(activations, evt_probs, alpha=1):
+def openmax_alpha(activations, evt_probs, alpha=1, run_paper_version=True):
     """
     Algorithm 2 OpenMax probability estimation with rejection of
     unknown or uncertain inputs.
@@ -19,19 +19,34 @@ def openmax_alpha(activations, evt_probs, alpha=1):
     8: Let y∗ = argmaxj P(y = j|x)
     9: Reject input if y∗ == 0 or P(y = y∗|x) < ǫ
     """
-    activations_org, evt_probs_org = activations, evt_probs
-    sorted_activations, indices = torch.sort(activations, descending=True, dim=1)
-    weights = torch.ones(activations.shape[1])
-    weights[:alpha] = torch.arange(1, alpha+1, step=1)
-    weights[:alpha] = (alpha-weights[:alpha])/alpha
-    weights = 1-(weights[None,:]*torch.gather(evt_probs, 1, indices))
-    revisted_activations = sorted_activations * weights
-    unknowness_class_prob = torch.sum(sorted_activations * (1-weights), dim=1)
-    revisted_activations = torch.gather(revisted_activations, 1, indices)
-    probability_vector = torch.cat([unknowness_class_prob[:,None], revisted_activations], dim=1)
-    probability_vector = F.softmax(probability_vector, dim=1)
+    # convert weibull CDF probabilities from knownness per class to unknownness per class
+    per_class_unknownness_prob = 1-evt_probs
 
+    # Line 1
+    sorted_activations, indices = torch.sort(activations, descending=True, dim=1)
+    weights = torch.ones(activations.shape[0],activations.shape[1])
+
+    # Line 2-4
+    weights[:,:alpha] = torch.arange(1, alpha+1, step=1)
+    if run_paper_version:
+        weights[:,:alpha] = (alpha-weights[:,:alpha])/alpha
+    else:
+        # The version in the code is slightly different from the algorithm mentioned in the paper
+        weights[:, :alpha] = ((alpha + 1) - weights[:, :alpha]) / alpha
+    weights[:,:alpha] = 1-weights[:,:alpha]*torch.gather(per_class_unknownness_prob, 1, indices[:,:alpha])
+
+    # Line 5
+    revisted_activations = sorted_activations * weights
+    # Line 6
+    unknowness_class_prob = torch.sum(sorted_activations * (1-weights), dim=1)
+    revisted_activations = torch.scatter(torch.ones(revisted_activations.shape), 1, indices, revisted_activations)
+    probability_vector = torch.cat([unknowness_class_prob[:,None], revisted_activations], dim=1)
+
+    # Line 7
+    probability_vector = F.softmax(probability_vector, dim=1)
+    # Line 8
     prediction_score, predicted_class = torch.max(probability_vector, dim=1)
+    # Line 9
     prediction_score[predicted_class == 0] = -1.
     predicted_class = predicted_class-1
 
