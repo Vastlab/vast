@@ -16,8 +16,8 @@ def MultiModalOpenMax_Params(parser):
                                           choices=['KMeans','dbscan','finch'],
                                           help='Clustering algorithm used for multi modal openmax default: %(default)s')
     return parser, dict(group_parser = MultiModalOpenMax_params,
-                        param_names = ("tailsize", "distance_multiplier"),
-                        param_id_string = "TS_{}_DM_{:.2f}")
+                        param_names = ("Clustering_Algo", "tailsize", "distance_multiplier"),
+                        param_id_string = "{}_TS_{}_DM_{:.2f}")
 
 def MultiModalOpenMax_Training(pos_classes_to_process, features_all_classes, args, gpu, models=None):
     from ..clusteringAlgos import clustering
@@ -48,6 +48,8 @@ def MultiModalOpenMax_Training(pos_classes_to_process, features_all_classes, arg
                 wbFits.append(weibull_model.wbFits)
                 smallScoreTensor.append(weibull_model.smallScoreTensor)
             if len(wbFits)==0:
+                yield (f"{args.Clustering_Algo}_TS_{tailsize}_DM_{distance_multiplier:.2f}",
+                       (pos_cls_name, None))
                 continue
             wbFits=torch.cat(wbFits)
             MAVs=torch.stack(MAVs)
@@ -58,7 +60,7 @@ def MultiModalOpenMax_Training(pos_classes_to_process, features_all_classes, arg
                                       translateAmountTensor=None,
                                       smallScoreTensor=smallScoreTensor))
             mr.tocpu()
-            yield (f"TS_{tailsize}_DM_{distance_multiplier:.2f}",
+            yield (f"{args.Clustering_Algo}_TS_{tailsize}_DM_{distance_multiplier:.2f}",
                    (pos_cls_name, dict(MAVs = MAVs.cpu(),
                                        weibulls = mr)))
 
