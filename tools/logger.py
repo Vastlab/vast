@@ -42,6 +42,8 @@ def get_logger(*args, **kwargs):
 def setup_logger(output=None,
                  distributed_rank=None, world_size=None,
                  color=True, level='DEBUG'):
+    if type(output) == pathlib.PosixPath:
+        output = str(output)
     logger = logging.getLogger()
     if type(level)==int:
         level = logging.getLevelName(level*10)
