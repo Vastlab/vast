@@ -58,7 +58,7 @@ def sphere(representation, target, sphere_radius = None):
 
     if sphere_radius is not None:
       sum += torch.sum(torch.clamp(sphere_radius - magnitude, min=0.))
-      total += torch.sum(knwon)
+      total += torch.sum(known)
 
 
   return torch.tensor((sum, total))
