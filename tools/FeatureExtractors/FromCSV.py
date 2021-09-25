@@ -78,7 +78,9 @@ def main(args):
         model = models.__dict__[args.arch](pretrained=True)
 
     if args.weights is not None:
-        state_dict = torch.load(args.weights, map_location="cpu")['state_dict']
+        state_dict = torch.load(args.weights, map_location="cpu")
+        if 'state_dict' in state_dict:
+            state_dict = state_dict['state_dict']
 
         if args.saved_with_data_parallel:
             new_state_dict = {}
@@ -90,18 +92,20 @@ def main(args):
             del state_dict['fc.weight']
             del state_dict['fc.bias']
 
-        """
         # specific to MoCoV2
-        for k in list(state_dict.keys()):
-            if k.startswith('module.encoder_q') and not k.startswith('module.encoder_q.fc'):
-                state_dict[k[len("module.encoder_q."):]] = state_dict[k]
-            del state_dict[k]
-        """
+        if any([k.startswith('module.encoder_q') for k in state_dict.keys()]):
+            logger.critical(f"\n\n\nAre you using a MoCo model? If not I may do something funky ahead")
+            if not args.dare_devil:
+                temp = input("\nPlease confirm to continue or press Ctrl+C to exit\n")
+            for k in list(state_dict.keys()):
+                if k.startswith('module.encoder_q') and not k.startswith('module.encoder_q.fc'):
+                    state_dict[k[len("module.encoder_q."):]] = state_dict[k]
+                del state_dict[k]
 
         msg = model.load_state_dict(state_dict, strict=False)
-        print(f"\n\n\nmsg {msg}")
+        print(f"\n\n\nMessage from model loading\n{msg}")
 
-        if len(msg.missing_keys)>0 or len(msg.unexpected_keys)>0:
+        if (len(msg.missing_keys)>0 or len(msg.unexpected_keys)>0) and not args.dare_devil:
             temp = input("\nPlease confirm to continue or press Ctrl+C to exit\n")
 
     print(f"\n\n######### Model Architecture for {args.arch} ##############")
@@ -196,6 +200,8 @@ if __name__ == '__main__':
                                             is different from the standard network architecture and the layer being 
                                             extracted is not the fc layer.
                                             """,
+                        default=False, action="store_true")
+    parser.add_argument("--dare-devil", help="don't wait for user input even if you think they may be doing something wrong",
                         default=False, action="store_true")
     args = parser.parse_args()
     if args.ignore_fc:
