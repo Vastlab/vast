@@ -2,7 +2,7 @@ import torch
 from torch.nn import functional as F
 
 
-def openmax_alpha(activations, evt_probs, alpha=1, run_paper_version=True):
+def openmax_alpha(evt_probs, activations, alpha=1, run_paper_version=True, *args, **kwargs):
     """
     Algorithm 2 OpenMax probability estimation with rejection of
     unknown or uncertain inputs.
@@ -50,16 +50,29 @@ def openmax_alpha(activations, evt_probs, alpha=1, run_paper_version=True):
     prediction_score[predicted_class == 0] = -1.
     predicted_class = predicted_class-1
 
-    return prediction_score, predicted_class
+    return predicted_class, prediction_score
 
-def magnitude_heuristic(features, gt, score):
+def magnitude_heuristic(score, features, *args, **kwargs):
     sample_magnitudes = torch.norm(features, p=2, dim=1)
     score, predicted_class = torch.max(score, dim=1)
     return (predicted_class, sample_magnitudes*score)
 
-def proximity_heuristic(features, centers, gt, score):
+def proximity_heuristic(score, features, centers, *args, **kwargs):
     distances_to_centers = torch.cdist(features, centers, p=2.0, compute_mode='donot_use_mm_for_euclid_dist')
     updated_score = distances_to_centers*score
     score = -1*updated_score
     score, predicted_class = torch.max(score, dim=1)
     return (predicted_class, score)
+
+def l1_normalization(evt_probs, *args, **kwargs):
+    """
+    WIP Algo
+    """
+    any_cls_max_knowness_probability, _ = torch.max(evt_probs, axis=1)
+    unknowness_class_prob = 1 - any_cls_max_knowness_probability
+    probability_tensor = torch.cat([unknowness_class_prob[:, None], evt_probs], dim=1)
+    probability_tensor = probability_tensor / torch.norm(probability_tensor, p=1, dim=1)[:, None]
+    prediction_score, predicted_class = torch.max(probability_tensor, dim=1)
+    prediction_score[predicted_class == 0] = -1.
+    predicted_class = predicted_class-1
+    return predicted_class, prediction_score
