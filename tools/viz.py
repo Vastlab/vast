@@ -1,9 +1,10 @@
+import os
 import numpy as np
 import itertools
 from matplotlib import pyplot as plt
 
 # Source for distinct colors https://sashat.me/2017/01/11/list-of-20-simple-distinct-colors/
-colors = np.array([
+colors_global = np.array([
     [230, 25, 75],
     [60, 180, 75],
     [255, 225, 25],
@@ -27,7 +28,7 @@ colors = np.array([
     [255, 255, 255],
     [0, 0, 0]
 ]).astype(np.float)
-colors = colors / 255.
+colors_global = colors_global / 255.
 
 
 def plot_histogram(pos_features, neg_features, pos_labels='Knowns', neg_labels='Unknowns', title="Histogram",
@@ -66,7 +67,6 @@ def plotter_2D(
         final=False,
         pred_weights=None,
         heat_map=False):
-    global colors
     plt.figure(figsize=[6, 6])
 
     if heat_map:
@@ -83,9 +83,10 @@ def plotter_2D(
 
         plt.pcolor(x, y, np.array(res).reshape(200, 200).transpose(), rasterized=True)
 
+    colors = colors_global
     if neg_features is not None:
         # Remove black color from knowns
-        colors = colors[:-1, :]
+        colors = colors_global[:-1, :]
 
     # TODO:The following code segment needs to be improved
     colors_with_repetition = colors.tolist()
@@ -94,8 +95,12 @@ def plotter_2D(
     colors_with_repetition.extend(colors.tolist()[:int(colors.shape[0] % len(set(labels.tolist())))])
     colors_with_repetition = np.array(colors_with_repetition)
 
-    plt.scatter(pos_features[:, 0], pos_features[:, 1], c=colors_with_repetition[labels.astype(np.int)],
-                edgecolors='none', s=0.5)
+    labels_to_int = np.zeros(labels.shape[0])
+    for i,l in enumerate(set(labels.tolist())):
+        labels_to_int[labels==l]=i
+
+    plt.scatter(pos_features[:, 0], pos_features[:, 1], c=colors_with_repetition[labels_to_int.astype(np.int)],
+                edgecolors='none', s=5)
     if neg_features is not None:
         plt.scatter(neg_features[:, 0], neg_features[:, 1], c='k', edgecolors='none', s=15, marker="*")
     if final:
@@ -129,7 +134,6 @@ def sigmoid_2D_plotter(
                         final=False,
                         pred_weights=None,
                         heat_map=False):
-    global colors
     plt.figure(figsize=[6, 6])
 
     if heat_map:
@@ -146,9 +150,10 @@ def sigmoid_2D_plotter(
 
         plt.pcolor(x, y, np.array(res).reshape(200, 200).transpose(), rasterized=True)
 
+    colors = colors_global
     if neg_features is not None:
         # Remove black color from knowns
-        colors = colors[:-1, :]
+        colors = colors_global[:-1, :]
 
     colors_with_repetition = colors.tolist()
     for i in range(10):
@@ -195,5 +200,75 @@ def plot_OSRC(to_plot, no_of_false_positives=None, filename=None, title=None):
     ax.legend(loc='lower center', bbox_to_anchor=(-1.25, 0.), ncol=1, fontsize=18, frameon=False)
     # ax.legend(loc="upper left")
     if filename is not None:
-        fig.savefig(f"{filename}.pdf", bbox_inches="tight")
+        if '.' not in filename:
+            filename=f"{filename}.pdf"
+        fig.savefig(f"{filename}", bbox_inches="tight")
     plt.show()
+
+
+def plot_3D(features, plane_cord, plane_activation, labels, output_file):
+    from plotly import graph_objects as go
+
+    colors = (colors_global * 255).astype(np.int)
+
+    feature_trace = []
+    plane_trace = []
+
+    fig = go.Figure()
+    for i,l in enumerate(list(set(labels.tolist()))):
+        color_string = f"{str(colors[i][0])},{str(colors[i][1])},{str(colors[i][2])}"
+        if l==-1:
+            color_string = f"0,0,0"
+        fig.add_trace(go.Scatter3d(x=features[:, 0][labels == l],
+                                   y=features[:, 1][labels == l],
+                                   z=np.zeros(np.sum(labels == l)),
+                                   marker=dict(
+                                       color=f"rgb({color_string})",
+                                       size=3, showscale=False, ),
+                                   mode="markers",
+                                   type="scatter3d"
+                                   ))
+        if i<plane_activation.shape[1]:
+            fig.add_trace(go.Surface(contours={"x": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                               "y": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                               "z": {"show": True, "start": -150, "end": 150, "size": 5.,
+                                                     "color": f"rgba({color_string},1.0)"}},
+                                     x=plane_cord[:, 0].tolist(),
+                                     y=plane_cord[:, 1].tolist(),
+                                     z=plane_activation[:, i].reshape(100, 100).tolist(),
+                                     colorscale=[
+                                         [0, f"rgba({color_string},1.)"],
+                                         [1, f"rgba({color_string},1.)"],
+                                     ],
+                                     showscale=False,
+                                     name=str(i) + " Plane",
+                                     type="surface"))
+
+    """
+    Use this to draw an alpha plane if needed
+    alpha_plane_z_value = 20
+    fig.add_trace(go.Surface(contours={"x": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                       "y": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                       "z": {"show": True, "start": -150, "end": 150, "size": 5.,
+                                             "color": f"rgba(0,0,0,1.0)"}},
+                             x=plane_cord[:, 0].tolist(),
+                             y=plane_cord[:, 1].tolist(),
+                             z=(np.ones((100, 100))*alpha_plane_z_value).tolist(),
+                             colorscale=[[0, f"rgba(0,0,0,1.)"], [1, f"rgba(0,0,0,1.)"]],
+                             showscale=False,
+                             name="Feature Plane",
+                             type="surface"))
+    """
+
+    fig.add_trace(go.Surface(contours={"x": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                       "y": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                       "z": {"show": True, "start": -150, "end": 150, "size": 5.,
+                                             "color": f"rgba(128,128,128,1.0)"}},
+                             x=plane_cord[:, 0].tolist(),
+                             y=plane_cord[:, 1].tolist(),
+                             z=np.zeros((100, 100)).tolist(),
+                             colorscale=[[0, f"rgba(128,128,128,1.)"], [1, f"rgba(128,128,128,1.)"]],
+                             showscale=False,
+                             name="Feature Plane",
+                             type="surface"))
+    fig.write_html(output_file)
