@@ -10,6 +10,11 @@ def common_processing(gt, predicted_class, score, knownness_score = None):
     :param score:
     :return:
     """
+    if len(predicted_class.shape)!=2:
+        predicted_class = predicted_class[:,None]
+    if len(score.shape)!=2:
+        score = score[:,None]
+
     if knownness_score is None:
         if len(score.shape)!=1:
             knownness_score = torch.max(score, dim=1).values
