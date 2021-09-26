@@ -36,12 +36,13 @@ class ConcatDataset(torch.utils.data.dataset.Dataset):
             all_sizes.append(len(e))
         return r, all_sizes
 
-    def __init__(self, datasets, BG=False):
+    def __init__(self, datasets, BG=False, no_of_classes=10):
         super(ConcatDataset, self).__init__()
         assert len(datasets) > 0, 'datasets should not be an empty iterable'
         self.datasets = list(datasets)
         self.cumulative_sizes, self.all_sizes = self.cumsum(self.datasets)
         self.BG = BG
+        self.no_of_classes = no_of_classes
 
     def __len__(self):
         return self.cumulative_sizes[-1]
@@ -58,7 +59,8 @@ class ConcatDataset(torch.utils.data.dataset.Dataset):
         elif dataset_idx == 1:
             if self.BG:
                 sample_idx = idx - self.cumulative_sizes[dataset_idx - 1]
-                to_return = (self.datasets[dataset_idx][sample_idx][0],10)
+                # Since zero indexed the index for BG class is no_of_classes
+                to_return = (self.datasets[dataset_idx][sample_idx][0], self.no_of_classes)
             else:
                 sample_idx = idx - self.cumulative_sizes[dataset_idx - 1]
                 to_return = (self.datasets[dataset_idx][sample_idx][0],-1)
