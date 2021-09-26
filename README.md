@@ -44,6 +44,9 @@ computation may have slight variations.
 
 ### Evaluation
 1. OSRC curve using torch tensors and cuda operations
+2. FPR vs coverage plot
+3. Precision/Recall for binary class OOD problem
+4. F-ß Score
 
 
 
