@@ -200,5 +200,75 @@ def plot_OSRC(to_plot, no_of_false_positives=None, filename=None, title=None):
     ax.legend(loc='lower center', bbox_to_anchor=(-1.25, 0.), ncol=1, fontsize=18, frameon=False)
     # ax.legend(loc="upper left")
     if filename is not None:
-        fig.savefig(f"{filename}.pdf", bbox_inches="tight")
+        if '.' not in filename:
+            filename=f"{filename}.pdf"
+        fig.savefig(f"{filename}", bbox_inches="tight")
     plt.show()
+
+
+def plot_3D(features, plane_cord, plane_activation, labels, output_file):
+    from plotly import graph_objects as go
+
+    colors = (colors_global * 255).astype(np.int)
+
+    feature_trace = []
+    plane_trace = []
+
+    fig = go.Figure()
+    for i,l in enumerate(list(set(labels.tolist()))):
+        color_string = f"{str(colors[i][0])},{str(colors[i][1])},{str(colors[i][2])}"
+        if l==-1:
+            color_string = f"0,0,0"
+        fig.add_trace(go.Scatter3d(x=features[:, 0][labels == l],
+                                   y=features[:, 1][labels == l],
+                                   z=np.zeros(np.sum(labels == l)),
+                                   marker=dict(
+                                       color=f"rgb({color_string})",
+                                       size=3, showscale=False, ),
+                                   mode="markers",
+                                   type="scatter3d"
+                                   ))
+        if i<plane_activation.shape[1]:
+            fig.add_trace(go.Surface(contours={"x": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                               "y": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                               "z": {"show": True, "start": -150, "end": 150, "size": 5.,
+                                                     "color": f"rgba({color_string},1.0)"}},
+                                     x=plane_cord[:, 0].tolist(),
+                                     y=plane_cord[:, 1].tolist(),
+                                     z=plane_activation[:, i].reshape(100, 100).tolist(),
+                                     colorscale=[
+                                         [0, f"rgba({color_string},1.)"],
+                                         [1, f"rgba({color_string},1.)"],
+                                     ],
+                                     showscale=False,
+                                     name=str(i) + " Plane",
+                                     type="surface"))
+
+    """
+    Use this to draw an alpha plane if needed
+    alpha_plane_z_value = 20
+    fig.add_trace(go.Surface(contours={"x": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                       "y": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                       "z": {"show": True, "start": -150, "end": 150, "size": 5.,
+                                             "color": f"rgba(0,0,0,1.0)"}},
+                             x=plane_cord[:, 0].tolist(),
+                             y=plane_cord[:, 1].tolist(),
+                             z=(np.ones((100, 100))*alpha_plane_z_value).tolist(),
+                             colorscale=[[0, f"rgba(0,0,0,1.)"], [1, f"rgba(0,0,0,1.)"]],
+                             showscale=False,
+                             name="Feature Plane",
+                             type="surface"))
+    """
+
+    fig.add_trace(go.Surface(contours={"x": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                       "y": {"show": True, "start": -2.5, "end": 2.5, "size": 5.},
+                                       "z": {"show": True, "start": -150, "end": 150, "size": 5.,
+                                             "color": f"rgba(128,128,128,1.0)"}},
+                             x=plane_cord[:, 0].tolist(),
+                             y=plane_cord[:, 1].tolist(),
+                             z=np.zeros((100, 100)).tolist(),
+                             colorscale=[[0, f"rgba(128,128,128,1.)"], [1, f"rgba(128,128,128,1.)"]],
+                             showscale=False,
+                             name="Feature Plane",
+                             type="surface"))
+    fig.write_html(output_file)
