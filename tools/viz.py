@@ -1,9 +1,10 @@
+import os
 import numpy as np
 import itertools
 from matplotlib import pyplot as plt
 
 # Source for distinct colors https://sashat.me/2017/01/11/list-of-20-simple-distinct-colors/
-colors = np.array([
+colors_global = np.array([
     [230, 25, 75],
     [60, 180, 75],
     [255, 225, 25],
@@ -27,7 +28,7 @@ colors = np.array([
     [255, 255, 255],
     [0, 0, 0]
 ]).astype(np.float)
-colors = colors / 255.
+colors_global = colors_global / 255.
 
 
 def plot_histogram(pos_features, neg_features, pos_labels='Knowns', neg_labels='Unknowns', title="Histogram",
@@ -66,7 +67,6 @@ def plotter_2D(
         final=False,
         pred_weights=None,
         heat_map=False):
-    global colors
     plt.figure(figsize=[6, 6])
 
     if heat_map:
@@ -83,9 +83,10 @@ def plotter_2D(
 
         plt.pcolor(x, y, np.array(res).reshape(200, 200).transpose(), rasterized=True)
 
+    colors = colors_global
     if neg_features is not None:
         # Remove black color from knowns
-        colors = colors[:-1, :]
+        colors = colors_global[:-1, :]
 
     # TODO:The following code segment needs to be improved
     colors_with_repetition = colors.tolist()
@@ -94,8 +95,12 @@ def plotter_2D(
     colors_with_repetition.extend(colors.tolist()[:int(colors.shape[0] % len(set(labels.tolist())))])
     colors_with_repetition = np.array(colors_with_repetition)
 
-    plt.scatter(pos_features[:, 0], pos_features[:, 1], c=colors_with_repetition[labels.astype(np.int)],
-                edgecolors='none', s=0.5)
+    labels_to_int = np.zeros(labels.shape[0])
+    for i,l in enumerate(set(labels.tolist())):
+        labels_to_int[labels==l]=i
+
+    plt.scatter(pos_features[:, 0], pos_features[:, 1], c=colors_with_repetition[labels_to_int.astype(np.int)],
+                edgecolors='none', s=5)
     if neg_features is not None:
         plt.scatter(neg_features[:, 0], neg_features[:, 1], c='k', edgecolors='none', s=15, marker="*")
     if final:
@@ -129,7 +134,6 @@ def sigmoid_2D_plotter(
                         final=False,
                         pred_weights=None,
                         heat_map=False):
-    global colors
     plt.figure(figsize=[6, 6])
 
     if heat_map:
@@ -146,9 +150,10 @@ def sigmoid_2D_plotter(
 
         plt.pcolor(x, y, np.array(res).reshape(200, 200).transpose(), rasterized=True)
 
+    colors = colors_global
     if neg_features is not None:
         # Remove black color from knowns
-        colors = colors[:-1, :]
+        colors = colors_global[:-1, :]
 
     colors_with_repetition = colors.tolist()
     for i in range(10):
