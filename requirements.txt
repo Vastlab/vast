@@ -4,3 +4,6 @@ matplotlib
 torch
 torchvision
 termcolor
+pre-commit
+black
+flake8
