@@ -28,4 +28,4 @@ def read_images(fname):
 #from .hindi_letters import hindi_letters
 #from .lfw import LFW
 #from .GridMNIST import GridMNIST
-from .ImageNetDali import *
+#from .ImageNetDali import *
