@@ -1,4 +1,4 @@
-glob
+glob2
 h5py
 numpy
 matplotlib
