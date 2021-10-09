@@ -1,3 +1,20 @@
+import warnings
+
+try:
+    import torch
+
+    print(f"pytorch installation found with version {torch.__version__}")
+except ImportError:
+    warnings.warn(
+        "Please install pytorch with gpu support using instructions at https://pytorch.org/"
+    )
+    raise
+
+if not torch.cuda.is_available():
+    warnings.warn(
+        "Pytorch not found with gpu support, it is recommended to reinstall with gpu support"
+    )
+
 import shlex
 import setuptools
 from setuptools import setup
