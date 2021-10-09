@@ -2,6 +2,7 @@ import shlex
 import setuptools
 from setuptools import setup
 from setuptools.command.develop import develop
+from setuptools.command.install import install
 from subprocess import check_call
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -10,13 +11,13 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = fh.read()
 
 
-class PostInstallCommand(develop):
+class PostInstallCommand(install):
     def run(self):
         try:
             check_call(shlex.split("pre-commit install"))
         except Exception:
-            print("Unable to run 'pre-commit install'")
-        develop.run(self)
+            print("\n\n\nUnable to run 'pre-commit install'\n\n\n")
+        install.run(self)
 
 
 setup(
@@ -29,4 +30,7 @@ setup(
     install_requires=requirements,
     packages=setuptools.find_packages(),
     url="https://github.com/akshay-raj-dhamija/vast",
+    cmdclass={
+        "install": PostInstallCommand,
+    },
 )

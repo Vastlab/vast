@@ -5,6 +5,7 @@ __pycache__/
 
 # Distribution / packaging
 develop-eggs/
+build/
 dist/
 eggs/
 .eggs/
@@ -17,4 +18,3 @@ wheels/
 
 .env
 .venv
-
