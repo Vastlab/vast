@@ -4,6 +4,7 @@ import numpy as np
 import time
 from ..tools import pairwisedistances
 
+
 def KMeans(x, K=450, verbose=True, init=None, seed=9, *args_passed, **kargs):
     """
     https://github.com/src-d/kmcuda
@@ -35,20 +36,22 @@ def KMeans(x, K=450, verbose=True, init=None, seed=9, *args_passed, **kargs):
 
     """
 
-    sys.path.insert(0, '/home/adhamija/kmcuda/src')
+    sys.path.insert(0, "/home/adhamija/kmcuda/src")
     from libKMCUDA import kmeans_cuda
 
     np.random.seed(1993)
     torch.manual_seed(0)
     if init is None:
-        random_indx = torch.randint(0,x.shape[0],(K,1)).to(x.device)
+        random_indx = torch.randint(0, x.shape[0], (K, 1)).to(x.device)
         if verbose:
             print(f"Initializing with indxs {random_indx}")
         random_indx = random_indx.repeat(1, x.shape[1])
         init = x.gather(0, random_indx).clone()
         init = init.numpy()
 
-    centroids, assignments = kmeans_cuda(x.numpy(), K, init=init, verbosity=verbose, seed=seed)
+    centroids, assignments = kmeans_cuda(
+        x.numpy(), K, init=init, verbosity=verbose, seed=seed
+    )
     centroids = torch.tensor(centroids)
     assignments = torch.tensor(assignments.astype(np.int64))
     assignments = assignments.type(torch.LongTensor)
@@ -56,7 +59,7 @@ def KMeans(x, K=450, verbose=True, init=None, seed=9, *args_passed, **kargs):
     return centroids, assignments
 
 
-def pykeops_KMeans(x, K=10, Niter=300, verbose=True, random_indx='first_k'):
+def pykeops_KMeans(x, K=10, Niter=300, verbose=True, random_indx="first_k"):
     # try:
     #     import pykeops
     #     pykeops.clean_pykeops()          # just in case old build files are still present
@@ -68,6 +71,7 @@ def pykeops_KMeans(x, K=10, Niter=300, verbose=True, random_indx='first_k'):
     #           f"More Information at https://www.kernel-operations.io/keops/python/installation.html")
     #     exit()
     from pykeops.torch import LazyTensor
+
     N, D = x.shape  # Number of samples, dimension of the ambient space
 
     # K-means loop:
@@ -75,13 +79,15 @@ def pykeops_KMeans(x, K=10, Niter=300, verbose=True, random_indx='first_k'):
     # - cl is the vector of class labels
     # - c  is the cloud of cluster centroids
     start = time.time()
-    if random_indx == 'first_k':
+    if random_indx == "first_k":
         c = x[:K, :].clone()  # Simplistic random initialization
     else:
-        random_indx = torch.randint(0,x.shape[0],(K,1))
+        random_indx = torch.randint(0, x.shape[0], (K, 1))
         print(f"Initializing with indxs {random_indx}")
         print(f"random_indx {random_indx.shape}")
-        print(f"random_indxrandom_indxrandom_indx {len(set(random_indx.squeeze().tolist()))}")
+        print(
+            f"random_indxrandom_indxrandom_indx {len(set(random_indx.squeeze().tolist()))}"
+        )
         random_indx = random_indx.repeat(1, x.shape[1])
         print(f"random_indx {random_indx.shape}")
         print(f"{torch.min(random_indx)} {torch.max(random_indx)}")
@@ -103,9 +109,14 @@ def pykeops_KMeans(x, K=10, Niter=300, verbose=True, random_indx='first_k'):
     end = time.time()
 
     if verbose:
-        print("K-means example with {:,} points in dimension {:,}, K = {:,}:".format(N, D, K))
-        print('Timing for {} iterations: {:.5f}s = {} x {:.5f}s\n'.format(
-                Niter, end - start, Niter, (end-start) / Niter))
+        print(
+            "K-means example with {:,} points in dimension {:,}, K = {:,}:".format(N, D, K)
+        )
+        print(
+            "Timing for {} iterations: {:.5f}s = {} x {:.5f}s\n".format(
+                Niter, end - start, Niter, (end - start) / Niter
+            )
+        )
 
     # Cluster_labels, Cluster_centers
     return cl, c
@@ -126,6 +137,7 @@ def pykeops_KMeans(x, K=10, Niter=300, verbose=True, random_indx='first_k'):
 
 def dbscan(x, distance_metric, eps=0.3, min_samples=10, *args_passed, **kargs):
     from sklearn.cluster import DBSCAN
+
     """
     x_i = LazyTensor(x[:, None, :])  # (Npoints, 1, D)
     x_j = LazyTensor(x[None, :, :])  # (1, Npoints, D)
@@ -134,23 +146,29 @@ def dbscan(x, distance_metric, eps=0.3, min_samples=10, *args_passed, **kargs):
     """
     x = x.cuda()
     distance_matrix = pairwisedistances.__dict__[distance_metric](x, x)
-    db = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1, metric='precomputed').fit(distance_matrix.cpu().numpy())
+    db = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1, metric="precomputed").fit(
+        distance_matrix.cpu().numpy()
+    )
     indx = torch.tensor(db.core_sample_indices_).cuda()
     if indx.shape[0] == 0:
         indx = torch.tensor([0]).cuda()
     # from IPython import embed;embed();
-    indx = indx[:,None].repeat(1, x.shape[1])
+    indx = indx[:, None].repeat(1, x.shape[1])
     centroids = x.gather(0, indx).cpu().clone()
-    return centroids, torch.tensor(db.labels_) #,db.core_sample_indices_
+    return centroids, torch.tensor(db.labels_)  # ,db.core_sample_indices_
+
 
 def finch(x, ind_of_interest=-1, *args_passed, **kargs):
     from .FINCH.python.finch import FINCH
-    c, num_clust, req_c = FINCH(x.cpu().numpy(),verbose=False)
+
+    c, num_clust, req_c = FINCH(x.cpu().numpy(), verbose=False)
     num_clust_obtained = num_clust[ind_of_interest]
-    assignments_of_interest = torch.tensor(c[:,ind_of_interest]).type(torch.LongTensor).cuda()
+    assignments_of_interest = (
+        torch.tensor(c[:, ind_of_interest]).type(torch.LongTensor).cuda()
+    )
     centroids = []
     x = x.cuda()
     for i in range(num_clust_obtained):
-        centroids.append(torch.mean(x[assignments_of_interest==i],dim=0))
+        centroids.append(torch.mean(x[assignments_of_interest == i], dim=0))
     centroids = torch.stack(centroids)
     return centroids, assignments_of_interest

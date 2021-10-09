@@ -3,12 +3,12 @@ This repository contains some common functionalities used in various works from 
 Vision And Security Technology (VAST) Lab.
 
 ## Setup
-Clone with sub modules such as `FINCH`  
-```git clone --recurse-submodules https://github.com/Vastlab/vast.git```  
+Clone with sub modules such as `FINCH`
+```git clone --recurse-submodules https://github.com/Vastlab/vast.git```
 
-Since this repository is being used as a package in various other repositories, it is recommended to 
-export the path this repository is cloned into the `PYTHONPATH` variable as:   
-```export PYTHONPATH="{PARENT_DIR_WHERE_REPO_IS_CLONED}:"```  
+Since this repository is being used as a package in various other repositories, it is recommended to
+export the path this repository is cloned into the `PYTHONPATH` variable as:
+```export PYTHONPATH="{PARENT_DIR_WHERE_REPO_IS_CLONED}:"```
 To make the change permanent please add the above to your `.bashrc`
 
 ## Contents:
@@ -28,8 +28,8 @@ To make the change permanent please add the above to your `.bashrc`
 3. Extreme Value Machine (EVM)
 
 ### Reimplementation of libMR
-This repo contains a torch based reimplementation of the [libMR repo](https://github.com/Vastlab/libMR)  
-It supports GPU based computation that speeds up the processing considerably, but in certain cases the weibull parameter 
+This repo contains a torch based reimplementation of the [libMR repo](https://github.com/Vastlab/libMR)
+It supports GPU based computation that speeds up the processing considerably, but in certain cases the weibull parameter
 computation may have slight variations.
 
 ### Tools
@@ -52,8 +52,7 @@ computation may have slight variations.
 
 
 ## Examples
-Some research works using this repo are:  
-[Self-Supervised Features Improve Open-World Learning](https://github.com/Vastlab/SSFiOWL)  
-[MNIST Based Experiments](https://github.com/Vastlab/MNIST_Experiments)  
-[ImageNet Level Openset experiments](https://github.com/Vastlab/ImageNetDali)  
-
+Some research works using this repo are:
+[Self-Supervised Features Improve Open-World Learning](https://github.com/Vastlab/SSFiOWL)
+[MNIST Based Experiments](https://github.com/Vastlab/MNIST_Experiments)
+[ImageNet Level Openset experiments](https://github.com/Vastlab/ImageNetDali)

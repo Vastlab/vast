@@ -11,17 +11,20 @@ from vast.DistributionModels import weibull
 
 logger = vastlogger.get_logger()
 
+
 class model_saver:
-    def __init__(self, args,
-                 process_combination: Tuple[str, int],
-                 total_no_of_classes: int,
-                 output_file_name: str = None
-                 ) -> None:
+    def __init__(
+        self,
+        args,
+        process_combination: Tuple[str, int],
+        total_no_of_classes: int,
+        output_file_name: str = None,
+    ) -> None:
         self.combination, self.process_rank = process_combination
         if output_file_name is None:
             model_file_name = pathlib.Path(f"{args.output_dir}/{self.combination}")
             model_file_name.mkdir(parents=True, exist_ok=True)
-            model_file_name = model_file_name/pathlib.Path(f"{args.OOD_Algo}_model.hdf5")
+            model_file_name = model_file_name / pathlib.Path(f"{args.OOD_Algo}_model.hdf5")
         else:
             model_file_name = output_file_name
         logger.info(f"Saving model file at {model_file_name}")
@@ -38,7 +41,7 @@ class model_saver:
 
     def close(self):
         self.hf.close()
-        logger.info(f"Closed model file successfully")
+        logger.info("Closed model file successfully")
 
     def process_dict(self, group, model):
         for key_name in model:
@@ -55,31 +58,41 @@ class model_saver:
             self.process_dict(group, model)
         else:
             logger.info(f" Class {cls_name} did not produce a model")
-        self.processed_classes+=1
-        if self.processed_classes%25==0:
-            logger.info(f"Saved {self.combination} model for {self.processed_classes}/{self.total_no_of_classes} classes")
+        self.processed_classes += 1
+        if self.processed_classes % 25 == 0:
+            logger.info(
+                f"Saved {self.combination} model for {self.processed_classes}/{self.total_no_of_classes} classes"
+            )
 
 
 def model_loader(args, combination_str, training_data=None):
-    model_file_name = pathlib.Path(f"{args.output_dir}/{combination_str}/{args.OOD_Algo}_model.hdf5")
+    model_file_name = pathlib.Path(
+        f"{args.output_dir}/{combination_str}/{args.OOD_Algo}_model.hdf5"
+    )
     logger.info(f"Loading model file {model_file_name}")
-    model_dict={}
+    model_dict = {}
     with h5py.File(model_file_name, "r") as hf:
         for cls in hf.keys():
-            model_dict[cls]={}
+            model_dict[cls] = {}
             for k in hf[cls].keys():
-                if k not in ['weibull', 'weibulls']:
+                if k not in ["weibull", "weibulls"]:
                     model_dict[cls][k] = torch.tensor(hf[cls][k][()])
                 else:
                     weibull_dict = {}
                     for param in hf[cls][k].keys():
                         weibull_dict[param] = torch.tensor(hf[cls][k][param][()])
-                    model_dict[cls][k] =  weibull.weibull(weibull_dict)
-            if args.OOD_Algo in ['EVM','Turbo_EVM'] and 'extreme_vectors' not in [*model_dict[cls]]:
+                    model_dict[cls][k] = weibull.weibull(weibull_dict)
+            if args.OOD_Algo in ["EVM", "Turbo_EVM"] and "extreme_vectors" not in [
+                *model_dict[cls]
+            ]:
                 if training_data is None:
-                    logger.error(f"Looks like you do not have the 'extreme_vectors' saved, "
-                                 f"please provide the training features so extreme_vectors_indexes can be used")
+                    logger.error(
+                        "Looks like you do not have the 'extreme_vectors' saved, "
+                        "please provide the training features so extreme_vectors_indexes can be used"
+                    )
                 else:
-                    model_dict[cls]['extreme_vectors'] = training_data[cls][model_dict[cls]['extreme_vectors_indexes'], :]
+                    model_dict[cls]["extreme_vectors"] = training_data[cls][
+                        model_dict[cls]["extreme_vectors_indexes"], :
+                    ]
     logger.info(f"Loaded OOD model from {model_file_name}")
     return model_dict

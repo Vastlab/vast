@@ -1,2 +1,3 @@
-__all__ = ['LeNet', 'LeNet_plus_plus']
+__all__ = ["LeNet", "LeNet_plus_plus"]
+
 from .architectures import *

@@ -6,15 +6,19 @@ from termcolor import colored
 import pathlib
 import atexit
 
+
 def time_recorder(func):
     @functools.wraps(func)
     def time_logger(*args, **kwargs):
         start = time.time()
         logger = get_logger()
         to_return = func(*args, **kwargs)
-        logger.info(f"Time taken to complete function {func.__name__} "
-                    f"{time.strftime('%H:%M:%S',time.gmtime(time.time() - start))}")
+        logger.info(
+            f"Time taken to complete function {func.__name__} "
+            f"{time.strftime('%H:%M:%S',time.gmtime(time.time() - start))}"
+        )
         return to_return
+
     return time_logger
 
 
@@ -25,40 +29,46 @@ class _ColorfulFormatter(logging.Formatter):
     def formatMessage(self, record):
         log = super(_ColorfulFormatter, self).formatMessage(record)
         if record.levelno == logging.CRITICAL:
-            return log[:(-1*len(record.message))] + " " + colored(record.message, "red", attrs=["underline"])
+            return (
+                log[: (-1 * len(record.message))]
+                + " "
+                + colored(record.message, "red", attrs=["underline"])
+            )
         return log
 
 
 @functools.lru_cache()  # so that calling setup_logger multiple times won't add many handlers
 def get_logger(*args, **kwargs):
-    if 'distributed_rank' not in kwargs or kwargs['distributed_rank'] is None:
+    if "distributed_rank" not in kwargs or kwargs["distributed_rank"] is None:
         return logging.getLogger()
     else:
         return setup_logger(*args, **kwargs)
 
 
-
 @functools.lru_cache()  # so that calling setup_logger multiple times won't add many handlers
-def setup_logger(output=None,
-                 distributed_rank=None, world_size=None,
-                 color=True, level='DEBUG'):
+def setup_logger(
+    output=None, distributed_rank=None, world_size=None, color=True, level="DEBUG"
+):
     if type(output) == pathlib.PosixPath:
         output = str(output)
     logger = logging.getLogger()
-    if type(level)==int:
-        level = logging.getLevelName(level*10)
+    if type(level) == int:
+        level = logging.getLevelName(level * 10)
     logger.setLevel(logging.__dict__[level])
     logger.propagate = False
 
-    plain_formatter = logging.Formatter("[%(asctime)s] %(name)s %(levelname)s: %(message)s",
-                                        datefmt="%m/%d %H:%M:%S")
+    plain_formatter = logging.Formatter(
+        "[%(asctime)s] %(name)s %(levelname)s: %(message)s", datefmt="%m/%d %H:%M:%S"
+    )
     ch = logging.StreamHandler(stream=sys.stdout)
     ch.setLevel(logging.__dict__[level])
     if color:
-        log_string = f"[%(asctime)s %(levelname)s]:{colored('%(filename)15s', 'blue')}:" \
-                     f"%(lineno)3s {colored('%(funcName)20s','grey', attrs=['bold'])}"
+        log_string = (
+            f"[%(asctime)s %(levelname)s]:{colored('%(filename)15s', 'blue')}:"
+            f"%(lineno)3s {colored('%(funcName)20s','grey', attrs=['bold'])}"
+        )
         if distributed_rank is not None:
-            log_string+=f"{colored(f'({distributed_rank}/{world_size})', 'magenta', attrs=['bold'])}"
+            log_string += f"{colored(f'({distributed_rank}/{world_size})', 'magenta', attrs=['bold'])}"
         log_string += " -- "
 
         formatter = _ColorfulFormatter(log_string + "%(message)s", datefmt="%H:%M:%S")
@@ -83,6 +93,7 @@ def setup_logger(output=None,
         logger.addHandler(fh)
 
     return logger
+
 
 # cache the opened file object, so that different calls to `setup_logger`
 # with the same file name can safely write to the same file.

@@ -63,4 +63,3 @@ else
         systemctl daemon-reload
         sh $NVIDIAPATH/nvidia-persistenced-init/install.sh
 fi
-
