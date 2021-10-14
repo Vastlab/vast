@@ -2,7 +2,7 @@
 [Insert License Here]
 =====
 
-Modified from Derek's original wrapper for MultipleEVM class from 2020.
+Modified from Derek's original 2020 wrapper for MultipleEVM class from VAST.
 """
 import logging
 
@@ -11,18 +11,56 @@ import numpy as np
 import torch
 
 from exputils.data.labels import NominalDataEncoder
-from exputils.ml.generics import SupervisedClassifier
+from exputils.ml.generic_predictors import SupervisedClassifier
+from exputils.io import create_filepath
 
-from vast.
+#from vast
 
 
 class EVM1vsRest(object):
-    """A single 1 vs Rest classifier for a known class in the EVM."""
+    """A single 1 vs Rest classifier for a known class in the EVM model. This
+    class is not intended to be used on its own during inference time, as it is
+    a only a part of the rest of the EVM. As such, this excludes the
+    hyperparameters of the EVM.
+
+    Attributes
+    ----------
+    extreme_vectors : torch.Tensor
+        A vector of exemplar samples used by the EVM.
+    extreme_vectors_indices : torch.LongTensor
+        The index of the extreme_vectors, only useful in case of reducing the
+        size of the EVM model saved.
+    weibulls: vast.weibull.weibull
+        A set of 1-D Weibull distributions fit to the distances and that
+        correspond to each extreme vector.
+        The output of `weibulls.return_all_parameters()` combined with the
+        `extreme_vectors` is the EVM 1vsRest for one class (This class).
+    class : int | str | None, optional
+        String or int identifier of the class this EVM1vsRest belongs to.
+    """
     def __init__(self):
         raise NotImplementedError()
 
+    def predict(self, ):
+        raise NotImplementedError()
+        return
 
-class ExtremeValueMachine(object):
+    def fit(self,):
+        raise NotImplementedError(
+            'This is not necessary atm, but is techinically possible to do.'
+        )
+
+    def save(self, h5):
+        """Save the model within the given H5DF file."""
+        raise NotImplementedError()
+
+    @staticmethod
+    def load(h5):
+        """Load the model from the given H5DF file."""
+        raise NotImplementedError()
+
+
+class ExtremeValueMachine(SupervisedClassifier):
     """Object Oriented Programming wrapper for the existing EVM funtions. This
     provides an object that contains a single EVM instance and streamlines the
     basic incremental supervised learning methods. The EVM consists of a
@@ -31,209 +69,64 @@ class ExtremeValueMachine(object):
 
     Attributes
     ----------
-    tailsize : int | float | torch.Tensor.float
+    tail_size : int | float | torch.Tensor.float
+        When an `int`, the number of distances on which the weibull models are
+        fit.
     cover_threshold : float | torch.Tensor.float
     distance_multiplier : float | Torch
-    distance_metric : str | func = 'cosine'
+    distance_metric : 'cosine' | 'euclidean'
+        The distance metric to use either 'cosine' or 'euclidean'.
     chunk_size : int = 200
-
-    extreme_vectors:
-    one_vs_rest_extreme_classifer:
+    one_vs_rests: {class_enc: EVM1vsRest} = None
+        A dictionary of class encoding to that class' 1 vs Rest classifier.
+        These 1 vs Rest classifiers form this EVM model.
     label_enc : NominalDataEncoder
-        The encoder to manage the labels known to the MEVM.
+        The encoder to manage the labels known to the EVM.
+    _increments : int = 0
+        The number of incremental learning phases completed.
 
     max_unknowns : int = None
-        The total number of unknowns expected by the MEVM, used when performing
-        incremental updates (currently not implemented in MEVM).
+        The total number of unknowns expected by the EVM, used when performing
+        incremental updates (currently not implemented in EVM).
     detection_threshold : float = None
         The threshold to apply to each sample's probability vector as an ad hoc
         solution to adjusting the MEVM's sensitivity to unknowns.
     """
     def __init__(
         self,
-        tailsize,
+        tail_size,
         cover_threshold,
         distance_multiplier,
+        labels,
         distance_metric='cosine',
         chunk_size=200,
-        labels=None,
-        #max_unknown=None,
-        #detection_threshold=None,
+        *args,
+        **kwargs,
     ):
-        #self.max_unknown = max_unknown
-        #self.detection_threshold = detection_threshold
+        # Create a NominalDataEncoder to handle the class encodings
+        super(ExtremeValueMachine, self).__init__(labels, *args, **kwargs)
+        self.one_vs_rests = None
+        self._increment = 0
 
-        super(ExtremeValueMachine, self).__init__(*args, **kwargs)
-
-        # Create a NominalDataEncoder to map class inputs to the MEVM internal
-        # class represntation.
-        if isinstance(labels, NominalDataEncoder) or labels is None:
-            self.label_enc = labels
-        elif isinstance(labels, list) or isinstance(labels, np.ndarray):
-            self.label_enc = NominalDataEncoder(labels)
-        else:
-            raise TypeError(' '.join([
-                'Expected `labels` of types: None, list, np.ndarray, or',
-                'NominalDataEncoder, not of type {type(labels)}'
-            ]))
-
-    def save(self, path):
-        """Save the model to the given location.
-        """
-
-    @staticmethod
-    def load(self, path):
-        """Load the model from the given location.
-        """
-
-    def fit(self, init_fit=False):
+    # TODO make this a ray function for easy parallelization.
+    def fit(self, points, labels=None,  extra_negatives=None, init_fit=None):
         """Fit the model with the given data either as initial fit or increment.
         Defaults to incremental fitting.
 
         Args
         ----
-        input_samples
-        labels
-        init_fit : bool = False
+        points : torch.Tensor | [torch.Tensor]
+        labels : torch.Tensor | [str | int] = None
+            The encoded labels as integers or a list of the unencoded labels
+            that corresponds to the list of pytorch tensors in `points`.
+        extra_negatives : torch.Tensor = None
+        init_fit : bool = None
+            By default, the ExtremeValueMachine keeps track of the number of
+            increments.
         """
 
-    def _initial_fit(self, ):
-        """
-        Args
-        ----
-        input_samples
-        labels
-        """
+        # TODO point and label conversion
 
-    def _increment_fit(self, ):
-        """
-        Args
-        ----
-        input_samples
-        labels
-        """
-
-    def save(self, h5):
-        """Performs the same save functionality as in MultipleEVM but adds a
-        dataset for the encoder's ordered labels and also saves the
-        hyperparameters for ease of storing and loading.
-        """
-        if self._evms is None:
-            raise RuntimeError("The model has not been trained yet.")
-
-        # Open file for writing; create if not existent
-        if isinstance(h5, str):
-            h5 = h5py.File(h5, 'w')
-
-        # Write EVMs
-        for i, evm in enumerate(self._evms):
-            evm.save(h5.create_group("EVM-%d" % (i+1)))
-
-        # Write labels for the encoder
-        if self.label_enc is None:
-            logging.info('No labels to be saved.')
-        else:
-            labels = self.labels
-            h5.attrs['labels_dtype'] = str(labels.dtype)
-
-            if labels.dtype.type is np.str_ or labels.dtype.type is np.string_:
-                h5.create_dataset(
-                    'labels',
-                    data=labels.astype(object),
-                    dtype=h5py.special_dtype(vlen=str),
-                )
-            else:
-                h5['labels'] = labels
-
-        # Write training vars
-        for attrib in ['tailsize', 'cover_threshold', 'distance_function',
-            'distance_multiplier', 'max_unknown', 'detection_threshold',
-        ]:
-            value = getattr(self, attrib)
-            if value is not None:
-                h5.attrs[attrib] = value
-
-    @staticmethod
-    def load(h5, labels=None, labels_dtype=None, train_hyperparams=None):
-        """Performs the same load functionality as in MultipleEVM but loads the
-        ordered labels from the h5 file for the label encoder and other
-        hyperparameters if they are present.
-        """
-        if isinstance(h5, str):
-            h5 = h5py.File(h5, 'r')
-
-        # load evms
-        _evms = []
-        i = 1
-        while "EVM-%d" % i in h5:
-            _evms.append(EVM(h5["EVM-%d" % (i)], log_level='debug'))
-            i += 1
-
-        # Load the ordered label into the NominalDataEncoder
-        if 'labels' in h5.keys():
-            if labels is not None:
-                logging.info(' '.join([
-                    '`labels` key exists in the HDF5 MEVM state file, but',
-                    'labels was given explicitly to MEVM.load(). Ignoring the',
-                    'labels in the HDF5 file.',
-                ]))
-                label_enc = NominalDataEncoder(labels)
-            else:
-                if labels_dtype is None:
-                    labels_dtype = np.dtype(h5.attrs['labels_dtype'])
-                label_enc = NominalDataEncoder(
-                    h5['labels'][:].astype(labels_dtype),
-                )
-        elif labels is not None:
-            label_enc = NominalDataEncoder(labels)
-        else:
-            logging.warning(' '.join([
-                'No `labels` dataset available in given hdf5. Relying on the',
-                'evm model\'s labels if they exist. Will fail if the MEVM',
-                'state does not have any labels in each of its EVM.',
-            ]))
-
-            label_enc = NominalDataEncoder(
-                [evm.label for evm in _evms],
-            )
-
-        # Load training vars if not given
-        if train_hyperparams is None:
-            # NOTE Able to specify which to load from h5 by passing a list.
-            train_hyperparams = [
-                'tailsize',
-                'cover_threshold',
-                'distance_function',
-                'distance_multiplier',
-                'max_unknown',
-                'detection_threshold',
-            ]
-
-        if isinstance(train_hyperparams, list):
-            train_hyperparams = {
-                attr: h5.attrs[attr] for attr in train_hyperparams
-                if attr in h5.attrs
-            }
-        elif not isinstance(train_hyperparams, dict):
-            raise TypeError(' '.join([
-                '`train_hyperparams` expected type: None, list, or dict, but',
-                f'recieved {type(train_hyperparams)}',
-            ]))
-
-        mevm = MEVM(label_enc, **train_hyperparams)
-        mevm._evms = _evms
-
-        return mevm
-
-    #def train(self, *args, **kwargs):
-    #    # NOTE this may be necessary if train or train_update are used instead
-    #    # of fit to keep the encoder in sync!
-    #    super(MEVM, self).train(*args, **kwargs)
-    #    self.label_enc = NominalDataEncoder([evm.label for evm in self._evms])
-
-    def fit(self, points, labels=None, extra_negatives=None):
-        """Wraps the MultipleEVM's train() and uses the encoder to
-        """
         # If points and labels are aligned sequence pair (X, y): adjust form
         if (
             isinstance(points, np.ndarray)
@@ -262,30 +155,6 @@ class ExtremeValueMachine(object):
                 'aligned list or np.ndarray',
             ]))
 
-        # Set encoder if labels is not None
-        if labels is not None:
-            if len(points) != len(labels):
-                raise ValueError(' '.join([
-                    'The given number of labels does not equal the number of',
-                    'classes represented by the list of points.',
-                    'If giving an aligned sequence pair of points and labels,',
-                    'then ensure `points` is of type `np.ndarray`.',
-                ]))
-
-            if self.label_enc is not None:
-                logging.debug(
-                    '`encoder` is not None and is being overwritten!',
-                )
-
-            if isinstance(labels, NominalDataEncoder):
-                self.label_enc = labels
-            elif isinstance(labels, list) or isinstance(labels, np.ndarray):
-                self.label_enc = NominalDataEncoder(labels)
-            else:
-                raise TypeError(' '.join([
-                    'Expected `labels` of types: None, list, np.ndarray, or',
-                    'NominalDataEncoder, not of type {type(labels)}'
-                ]))
 
         # Ensure extra_negatives is of expected form (no labels for these)
         if (
@@ -303,13 +172,143 @@ class ExtremeValueMachine(object):
                 f'But recieved type `{type(extra_negatives)}`.',
             ]))
 
-        # Points is now list(torch.Tensors) and encoder handled.
 
-        # TODO handle adjust of extra negatives as a list of labels to be known
-        # unknowns. For now, expects extra_negatives always of correct type.
-        self.train(points, labels, extra_negatives)
 
-    def predict(self, points, return_tensor=False, threshold_unknowns=False):
+
+        if init_fit or (init_fit is None and self._increment == 0):
+            self._initial_fit(points, extra_negatives)
+        else: # Incremental fit
+            self._increment_fit(points, extra_negatives)
+
+    # TODO make this a ray function for easy parallelization.
+    def _initial_fit(self, points, extra_negatives=None):
+        """Fits the
+
+        Args
+        ----
+        points : torch.Tensor | [torch.Tensor]
+        labels : torch.Tensor | [str | int] = None
+        extra_negatives : torch.Tensor = None
+        """
+        #self.one_vs_rests =
+        self._increments = 1
+
+    # TODO make this a ray function for easy parallelization.
+    def _increment_fit(self, points, extra_negatives=None):
+        """Performs and incremental fitting of the current EVM.
+        Args
+        ----
+        points : torch.Tensor | [torch.Tensor]
+        labels : torch.Tensor | [str | int] = None
+        extra_negatives : torch.Tensor = None
+        """
+        #self.one_vs_rests =
+        self._increments += 1
+
+    def save(self, h5, overwrite=False):
+        """Saves the EVM model as H5DF to disk with the labels and parameters.
+        """
+        if self.one_vs_rests is None:
+            raise RuntimeError("The model has not been trained yet.")
+
+        # Open file for writing; create if not existent and avoid overwriting.
+        if isinstance(h5, str):
+            h5 = h5py.File(create_filepath(h5, overwrite), 'w')
+
+        # Save the EVMs
+        for idx, one_vs_rest in self.one_vs_rests.items():
+            one_vs_rest.save(h5.create_group(f'EVM1vsRest-{idx}'))
+
+        # Save the labels for the encoder
+        labels = self.labels
+        h5.attrs['labels_dtype'] = str(labels.dtype)
+
+        # NOTE This does not save the encoding of the class if diff from [0,
+        # len(labels)]!!!!!! Order is preserved though.
+        if labels.dtype.type is np.str_ or labels.dtype.type is np.string_:
+            h5.create_dataset(
+                'labels',
+                data=labels.astype(object),
+                dtype=h5py.special_dtype(vlen=str),
+            )
+        else:
+            h5['labels'] = labels
+
+        # Write hyperparameters
+        for attrib in [
+            'tail_size',
+            'cover_threshold',
+            'distance_function',
+            'distance_multiplier',
+            'chunk_size',
+            '_increments',
+        ]:
+            h5.attrs[attrib] = getattr(self, attrib)
+
+    @staticmethod
+    def load(h5, labels=None, labels_dtype=None, train_hyperparams=None):
+        """Performs the same load functionality as in MultipleEVM but loads the
+        ordered labels from the h5 file for the label encoder and other
+        hyperparameters if they are present.
+        """
+        if isinstance(h5, str):
+            h5 = h5py.File(h5, 'r')
+
+        # Load the ordered labels into the NominalDataEncoder
+        if 'labels' in h5.keys():
+            if labels is not None:
+                logging.info(' '.join([
+                    '`labels` key exists in the HDF5 MEVM state file, but',
+                    'labels was given explicitly to `load()`. Ignoring the',
+                    'labels in the HDF5 file.',
+                ]))
+            else:
+                if labels_dtype is None:
+                    labels_dtype = np.dtype(h5.attrs['labels_dtype'])
+                labels = h5['labels'][:].astype(labels_dtype)
+        elif labels is None:
+            raise KeyError(' '.join([
+                'No `labels` dataset available in given hdf5.',
+                'and `labels` parameter is None',
+            ]))
+
+        # Load the EVM1vsRest models
+        one_vs_rests = {}
+        for i, label in enumerate(labels):
+            if f'EVM1vsRest-{i}' in h5.keys():
+                one_vs_rests[i] = EVM1vsRest.load(h5[f'EVM1vsRest-{i}'])
+
+        # Load training vars if not given
+        if train_hyperparams is None:
+            # NOTE Able to specify which to load from h5 by passing a list.
+            train_hyperparams = [
+                'tail_size',
+                'cover_threshold',
+                'distance_function',
+                'distance_multiplier',
+                'chunk_size',
+                '_increments',
+            ]
+
+        if isinstance(train_hyperparams, list):
+            train_hyperparams = {
+                attr: h5.attrs[attr] for attr in train_hyperparams
+                if attr in h5.attrs
+            }
+        elif not isinstance(train_hyperparams, dict):
+            raise TypeError(' '.join([
+                '`train_hyperparams` expected type: None, list, or dict, but',
+                f'recieved {type(train_hyperparams)}',
+            ]))
+
+        _increments = train_hyperparams.pop('_increments')
+        evm = ExtremeValueMachine(labels=labels, **train_hyperparams)
+        evm.one_vs_rests = one_vs_rests
+        evm._increments = _increments
+
+        return evm
+
+    def predict(self, points, return_tensor=True, threshold_unknowns=False):
         """Wraps the MultipleEVM's class_probabilities and uses the encoder to
         keep labels as expected by the user. Also adjusts the class
         probabilities to include the unknown class.
@@ -317,7 +316,7 @@ class ExtremeValueMachine(object):
         Args
         ----
         points : torch.Tensor
-        return_tesnor : bool = False
+        return_tesnor : bool = True
         threshold_unknowns : bool = False
             If True, applies the unknown threshold to the probability vector
             and returns the resulting argmax of the probability vector per
@@ -327,17 +326,10 @@ class ExtremeValueMachine(object):
         -------
         np.ndarray
         """
-        if isinstance(points, np.ndarray):
-            points = torch.Tensor(points)
-        elif not isinstance(points, torch.Tensor):
-            raise TypeError(
-                'expected points to be of type: np.ndarray or torch.Tensor',
-            )
+        if not isinstance(points, torch.Tensor):
+            raise TypeError('expected points to be of type: torch.Tensor')
 
-        probs = self.class_probabilities(points)
-
-        if return_tensor:
-            raise NotImplementedError('Not yet.')
+        #probs = self.class_probabilities(points)
 
         # Find probability of unknown as its own class
         probs = np.array(probs)
@@ -349,6 +341,7 @@ class ExtremeValueMachine(object):
         probs = np.hstack((probs, unknown_probs))
 
         # TODO if threshold_unknowns: Apply thresholding
+        """
         if threshold_unknowns:
             if self.detection_threshold is None:
                 raise ValueError('`detection_threshold` is not set!')
@@ -358,5 +351,6 @@ class ExtremeValueMachine(object):
             ] = self.labels.unknown_idx
 
             return argmax
+        """
 
         return probs
