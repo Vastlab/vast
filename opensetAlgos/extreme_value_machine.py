@@ -199,6 +199,14 @@ class ExtremeValueMachine(SupervisedClassifier):
         labels : torch.Tensor | [str | int] = None
         extra_negatives : torch.Tensor = None
         """
+        EVM_Training(
+            list(self.label_enc.encoder.inv),
+            points,
+            args,
+            self.device,
+            models,
+        )
+
         #self.one_vs_rests =
         self._increments = 1
 
@@ -214,16 +222,25 @@ class ExtremeValueMachine(SupervisedClassifier):
         #self.one_vs_rests =
         self._increments += 1
 
+    # TODO make this a ray function for easy parallelization. Lesser priority
     def known_probs(self, points, gpu=None):
         """Predicts the known class probabilities of the given points."""
         raise NotImplementedError()
 
+        # TODO need to package args and models as they expect.
         probs = [i for i in
-            EVM_Inference(label_encs, points, args, gpu, self.one_vs_rests)
+            EVM_Inference(
+                list(self.label_enc.encoder.inv),
+                points,
+                args,
+                self.device,
+                self.one_vs_rests,
+            )
         ]
 
         return
 
+    # TODO make this a ray function for easy parallelization. Lesser priority
     def predict(self, points):
         """Wraps the MultipleEVM's class_probabilities and uses the encoder to
         keep labels as expected by the user. Also adjusts the class
