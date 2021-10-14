@@ -3,6 +3,8 @@
 =====
 
 Modified from Derek's original 2020 wrapper for MultipleEVM class from VAST.
+This also performs some modifications to the older MultipleEVM code for saving
+and loading the EVM1vsRest objects.
 """
 import logging
 
@@ -14,7 +16,7 @@ from exputils.data.labels import NominalDataEncoder
 from exputils.ml.generic_predictors import SupervisedClassifier
 from exputils.io import create_filepath
 
-#from vast
+#from vast.opensetAlgos.EVM import EVM_Training, EVM_Inference
 
 
 class EVM1vsRest(object):
@@ -84,6 +86,8 @@ class ExtremeValueMachine(SupervisedClassifier):
         The encoder to manage the labels known to the EVM.
     _increments : int = 0
         The number of incremental learning phases completed.
+    device : torch.device = 'cuda'
+        The torch device to compute fitting and predictions on.
 
     max_unknowns : int = None
         The total number of unknowns expected by the EVM, used when performing
@@ -100,6 +104,7 @@ class ExtremeValueMachine(SupervisedClassifier):
         labels,
         distance_metric='cosine',
         chunk_size=200,
+        device='cuda',
         *args,
         **kwargs,
     ):
@@ -107,6 +112,7 @@ class ExtremeValueMachine(SupervisedClassifier):
         super(ExtremeValueMachine, self).__init__(labels, *args, **kwargs)
         self.one_vs_rests = None
         self._increment = 0
+        self.device = torch.device(device)
 
     # TODO make this a ray function for easy parallelization.
     def fit(self, points, labels=None,  extra_negatives=None, init_fit=None):
@@ -156,6 +162,9 @@ class ExtremeValueMachine(SupervisedClassifier):
             ]))
 
 
+
+
+
         # Ensure extra_negatives is of expected form (no labels for these)
         if (
             (
@@ -165,15 +174,15 @@ class ExtremeValueMachine(SupervisedClassifier):
             or isinstance(extra_negatives, list)
         ):
             extra_negatives = torch.Tensor(extra_negatives)
-        elif not isinstance(extra_negatives, torch.Tensor):
+        elif not (
+            isinstance(extra_negatives, torch.Tensor)
+            and len(extra_negatives.shape) == 2
+        ):
             raise TypeError(' '.join([
                 'The extra_negatives must be either None, torch.Tensor of',
                 'shape 2, or an object broadcastable to such a torch.Tensor.',
                 f'But recieved type `{type(extra_negatives)}`.',
             ]))
-
-
-
 
         if init_fit or (init_fit is None and self._increment == 0):
             self._initial_fit(points, extra_negatives)
@@ -204,6 +213,44 @@ class ExtremeValueMachine(SupervisedClassifier):
         """
         #self.one_vs_rests =
         self._increments += 1
+
+    def known_probs(self, points, gpu=None):
+        """Predicts the known class probabilities of the given points."""
+        raise NotImplementedError()
+
+        probs = [i for i in
+            EVM_Inference(label_encs, points, args, gpu, self.one_vs_rests)
+        ]
+
+        return
+
+    def predict(self, points):
+        """Wraps the MultipleEVM's class_probabilities and uses the encoder to
+        keep labels as expected by the user. Also adjusts the class
+        probabilities to include the unknown class.
+
+        Args
+        ----
+        points : torch.Tensor
+
+        Returns
+        -------
+        torch.Tensor
+            A torch tensor of a vector of probabilities per sample, including
+            an unknown class probability.
+        """
+        if not isinstance(points, torch.Tensor):
+            raise TypeError('expected `points` to be of type: torch.Tensor')
+
+        probs = self.known_probs(points)
+
+        # Find probability of unknown as its own class
+        probs = np.array(probs)
+        max_probs_known = torch.max(probs, dim=1).values.reshape(-1, 1)
+        unknown_probs = 1 - max_probs_known
+
+        # Scale the rest of the known class probs by max prob known
+        return torch.cat((probs * max_probs_known, unknown_probs), 1)
 
     def save(self, h5, overwrite=False):
         """Saves the EVM model as H5DF to disk with the labels and parameters.
@@ -307,50 +354,3 @@ class ExtremeValueMachine(SupervisedClassifier):
         evm._increments = _increments
 
         return evm
-
-    def predict(self, points, return_tensor=True, threshold_unknowns=False):
-        """Wraps the MultipleEVM's class_probabilities and uses the encoder to
-        keep labels as expected by the user. Also adjusts the class
-        probabilities to include the unknown class.
-
-        Args
-        ----
-        points : torch.Tensor
-        return_tesnor : bool = True
-        threshold_unknowns : bool = False
-            If True, applies the unknown threshold to the probability vector
-            and returns the resulting argmax of the probability vector per
-            sample.
-
-        Returns
-        -------
-        np.ndarray
-        """
-        if not isinstance(points, torch.Tensor):
-            raise TypeError('expected points to be of type: torch.Tensor')
-
-        #probs = self.class_probabilities(points)
-
-        # Find probability of unknown as its own class
-        probs = np.array(probs)
-        max_probs_known = probs.max(axis=1).reshape(-1, 1)
-        unknown_probs = 1 - max_probs_known
-
-        # Scale the rest of the known class probs by max prob known
-        probs *= max_probs_known
-        probs = np.hstack((probs, unknown_probs))
-
-        # TODO if threshold_unknowns: Apply thresholding
-        """
-        if threshold_unknowns:
-            if self.detection_threshold is None:
-                raise ValueError('`detection_threshold` is not set!')
-            argmax = probs.argmax(1)
-            argmax[
-                probs[np.arange(probs.shape[0]), argmax] < threshold[0]
-            ] = self.labels.unknown_idx
-
-            return argmax
-        """
-
-        return probs
