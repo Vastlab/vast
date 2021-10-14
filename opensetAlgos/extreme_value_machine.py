@@ -223,25 +223,25 @@ class ExtremeValueMachine(SupervisedClassifier):
         self._increments += 1
 
     # TODO make this a ray function for easy parallelization. Lesser priority
-    def known_probs(self, points, gpu=None):
-        """Predicts the known class probabilities of the given points."""
-        raise NotImplementedError()
-
-        # TODO need to package args and models as they expect.
-        probs = [i for i in
-            EVM_Inference(
+    def one_vs_rest_probs(self, points, gpu=None):
+        """Predicts the 1 vs Rest class probabilities for the points. This
+        vector does not sum to one!
+        """
+        return EVM_Inference(
                 list(self.label_enc.encoder.inv),
                 points,
                 args,
                 self.device,
                 self.one_vs_rests,
-            )
-        ]
+            )[1][1]
 
-        return
+    def known_probs(self, points, gpu=None):
+        """Predicts known probability vector without the unknown class."""
+        probs = self.one_vs_rest_probs(points)
+        return probs / probs.sum(1, True)
 
     # TODO make this a ray function for easy parallelization. Lesser priority
-    def predict(self, points):
+    def predict(self, points, unknown_last_dim=True):
         """Wraps the MultipleEVM's class_probabilities and uses the encoder to
         keep labels as expected by the user. Also adjusts the class
         probabilities to include the unknown class.
@@ -249,25 +249,30 @@ class ExtremeValueMachine(SupervisedClassifier):
         Args
         ----
         points : torch.Tensor
+        unknown_last_dim : bool = True
+            If True, the element of the probability vector representing the
+            unknown class is appeneded to the end of the vector. Otherwise, it
+            is at the beginning.
 
         Returns
         -------
         torch.Tensor
             A torch tensor of a vector of probabilities per sample, including
-            an unknown class probability.
+            an unknown class probability as the last dimension.
         """
         if not isinstance(points, torch.Tensor):
             raise TypeError('expected `points` to be of type: torch.Tensor')
 
-        probs = self.known_probs(points)
+        probs = self.one_vs_rest_probs(points)
 
-        # Find probability of unknown as its own class
-        probs = np.array(probs)
-        max_probs_known = torch.max(probs, dim=1).values.reshape(-1, 1)
-        unknown_probs = 1 - max_probs_known
+        # Find probability of unknown as 1 - max 1-vs-Rest and concat
+        if unknown_last_dim:
+            probs = torch.cat((probs, 1 - torch.max(probs, 1, True).values), 1)
+        else:
+            probs = torch.cat((1 - torch.max(probs, 1, True).values, probs), 1)
 
-        # Scale the rest of the known class probs by max prob known
-        return torch.cat((probs * max_probs_known, unknown_probs), 1)
+        # Get a normalized probability vector keeping raitos of values.
+        return probs / probs.sum(1, True)
 
     def save(self, h5, overwrite=False):
         """Saves the EVM model as H5DF to disk with the labels and parameters.
