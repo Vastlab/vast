@@ -34,14 +34,17 @@ try:
 except:
     DeiT_support = False
 
-ss_models_mapping = {
-    "SimCLR": {
-        "url": "https://pl-bolts-weights.s3.us-east-2.amazonaws.com/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt",
-        "transform": self_supervised.simclr.transforms.SimCLREvalDataTransform().online_transform,
-    },
-    # "SwAV":{"url":"https://pl-bolts-weights.s3.us-east-2.amazonaws.com/swav/swav_imagenet/swav_imagenet.pth.tar",
-    #         "transform"}
-}
+if pl_bolts:
+    ss_models_mapping = {
+        "SimCLR": {
+            "url": "https://pl-bolts-weights.s3.us-east-2.amazonaws.com/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt",
+            "transform": self_supervised.simclr.transforms.SimCLREvalDataTransform().online_transform,
+        },
+        # "SwAV":{"url":"https://pl-bolts-weights.s3.us-east-2.amazonaws.com/swav/swav_imagenet/swav_imagenet.pth.tar",
+        #         "transform"}
+    }
+else:
+    ss_models_mapping = {}
 
 
 def get_last_layer_name(net):
