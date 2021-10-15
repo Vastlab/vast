@@ -44,7 +44,9 @@ class EVM1vsRest(object):
         raise NotImplementedError()
 
     def predict(self, ):
-        raise NotImplementedError()
+        raise NotImplementedError(
+            'This is not necessary atm, but is techinically possible to do.'
+        )
         return
 
     def fit(self,):
@@ -157,13 +159,9 @@ class ExtremeValueMachine(SupervisedClassifier):
         else:
             raise TypeError(' '.join([
                 'expected points to be of types: list(np.ndarray),',
-                'list(torch.tensor), or np.ndarray with labels as an',
-                'aligned list or np.ndarray',
+                'list(torch.Tensor), or (np.ndarray torch.Tensor) with labels',
+                'as an aligned (list or np.ndarray)',
             ]))
-
-
-
-
 
         # Ensure extra_negatives is of expected form (no labels for these)
         if (
