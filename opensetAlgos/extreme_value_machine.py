@@ -139,9 +139,10 @@ class ExtremeValueMachine(SupervisedClassifier):
 
     Attributes
     ----------
-    tail_size : int | float | torch.Tensor.float
+    tail_size : int | float
         When an `int`, the number of distances on which the weibull models are
-        fit.
+        fit. When a float, then it is the ratio of points in the initial fit to
+        use as the tail size.
     cover_threshold : float | torch.Tensor.float
     distance_multiplier : float | Torch
     distance_metric : 'cosine' | 'euclidean'
@@ -181,6 +182,7 @@ class ExtremeValueMachine(SupervisedClassifier):
         distance_metric='cosine',
         chunk_size=200,
         device='cuda',
+        tail_size_is_ratio=True,
         *args,
         **kwargs,
     ):
@@ -191,6 +193,11 @@ class ExtremeValueMachine(SupervisedClassifier):
         self.device = torch.device(device)
 
         self.tail_size = tail_size
+        if tail_size_is_ratio:
+            self.tail_size_int = None
+        else:
+            self.tail_size_int = self.tail_size
+
         self.cover_threshold = cover_threshold
         self.distance_multiplier = distance_multiplier
         self.distance_metric = distance_metric
@@ -207,7 +214,7 @@ class ExtremeValueMachine(SupervisedClassifier):
             A dictionary of the EVM's hyperparameters as used by vast package.
         """
         return EVMParams(
-            self.tail_size,
+            self.tail_size_int,
             self.cover_threshold,
             self.distance_multiplier,
             self.distance_metric,
@@ -301,6 +308,9 @@ class ExtremeValueMachine(SupervisedClassifier):
         labels : torch.Tensor | [str | int] = None
         extra_negatives : torch.Tensor = None
         """
+        if self.tail_size_int is None:
+            self.tail_size_int = int(np.round(self.tail_size * len(points)))
+
         evm_fit = EVM_Training(
             list(self.label_enc.encoder.inv),
             points,
@@ -309,7 +319,7 @@ class ExtremeValueMachine(SupervisedClassifier):
         )[1]
 
         self.one_vs_rests = {
-            one_vs_rest[0]: evm1vsrest(
+            one_vs_rest[0]: EVM1vsRest(
                 one_vs_rest[1]['extreme_vectors'],
                 one_vs_rest[1]['extreme_vectors_indexes'],
                 one_vs_rest[1]['weibulls'],
@@ -460,6 +470,7 @@ class ExtremeValueMachine(SupervisedClassifier):
             'distance_multiplier',
             'chunk_size',
             '_increments',
+            'tail_size_int',
         ]:
             h5.attrs[attrib] = getattr(self, attrib)
 
@@ -506,6 +517,7 @@ class ExtremeValueMachine(SupervisedClassifier):
                 'distance_multiplier',
                 'chunk_size',
                 '_increments',
+                'tail_size_int',
             ]
 
         if isinstance(train_hyperparams, list):
