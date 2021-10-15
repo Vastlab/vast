@@ -1,6 +1,10 @@
+glob2
 h5py
 numpy
 matplotlib
 torch
 torchvision
 termcolor
+pre-commit
+black
+flake8
