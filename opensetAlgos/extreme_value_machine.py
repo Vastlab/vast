@@ -7,6 +7,7 @@ This also performs some modifications to the older MultipleEVM code for saving
 and loading the EVM1vsRest objects.
 """
 import logging
+from dataclasses import dataclass
 
 import h5py
 import numpy as np
@@ -16,9 +17,10 @@ from exputils.data.labels import NominalDataEncoder
 from exputils.ml.generic_predictors import SupervisedClassifier
 from exputils.io import create_filepath
 
-#from vast.opensetAlgos.EVM import EVM_Training, EVM_Inference
+from vast.opensetAlgos.EVM import EVM_Training, EVM_Inference
+from vast.DistributionModels.weibull import weibull
 
-
+@dataclass
 class EVM1vsRest(object):
     """A single 1 vs Rest classifier for a known class in the EVM model. This
     class is not intended to be used on its own during inference time, as it is
@@ -37,31 +39,77 @@ class EVM1vsRest(object):
         correspond to each extreme vector.
         The output of `weibulls.return_all_parameters()` combined with the
         `extreme_vectors` is the EVM 1vsRest for one class (This class).
-    class : int | str | None, optional
-        String or int identifier of the class this EVM1vsRest belongs to.
     """
-    def __init__(self):
-        raise NotImplementedError()
+    # TODO consider saving EVM attribs in the EVM1vsRest. Redundant though.
+    extreme_vectors : torch.Tensor
+    extreme_vectors_indices : torch.Tensor
+    weibulls : weibull
 
-    def predict(self, ):
+    def predict(self, points):
         raise NotImplementedError(
             'This is not necessary atm, but is techinically possible to do.'
         )
         return
 
-    def fit(self,):
+    def fit(self, points):
         raise NotImplementedError(
             'This is not necessary atm, but is techinically possible to do.'
         )
 
-    def save(self, h5):
+    def save(self, h5, overwrite=False):
         """Save the model within the given H5DF file."""
-        raise NotImplementedError()
+        # Open file for writing; create if not existent and avoid overwriting.
+        if isinstance(h5, str):
+            h5 = h5py.File(create_filepath(h5, overwrite), 'w')
+
+        # Save extreme vectors
+        h5.create_dataset('extreme_vectors', data=self.extreme_vectors.cpu())
+
+        # Save extreme vectors indices
+        h5.create_dataset(
+            'extreme_vectors_indices',
+            data=self.extreme_vectors_indices.cpu(),
+        )
+
+        # Save weibulls
+        h5_weibulls = h5.create_group('weibulls')
+        params = self.weibulls.return_all_parameters()
+
+        h5_weibulls.create_dataset('Scale',data=params['Scale'].cpu())
+        h5_weibulls.create_dataset('Shape',data=params['Shape'].cpu())
+        h5_weibulls.create_dataset('signTensor',data=params['signTensor'])
+        # TODO rm translateAmountTensor as it is depract in current weibull
+        h5_weibulls.create_dataset(
+            'translateAmountTensor',
+            data=params['translateAmountTensor'],
+        )
+        h5_weibulls.create_dataset(
+            'smallScore',
+            data=params['smallScoreTensor'].cpu(),
+        )
 
     @staticmethod
     def load(h5):
         """Load the model from the given H5DF file."""
-        raise NotImplementedError()
+        # Open the H5DF for reading
+        if isinstance(h5, str):
+            h5 = h5py.File(h5, 'r')
+
+        # TODO rm translateAmountTensor as it is depract in current weibull
+
+        # Load extreme_vectors, extreme_vectors_indices, and weibulls
+        return EVM1vsRest(
+            torch.tensor(h5['extreme_vectors'][()]),
+            torch.tensor(h5['extreme_vectors_indices'][()]),
+            weibull({
+                'Scale': torch.from_numpy(h5['weibulls']['Scale'][()]),
+                'Shape': torch.from_numpy(h5['weibulls']['Shape'][()]),
+                'signTensor': h5['weibulls']['signTensor'][()],
+                'translateAmountTensor':
+                    h5['weibulls']['translateAmountTensor'][()],
+                'smallScoreTensor': torch.from_numpy(e['smallScore'][()]),
+            }),
+        )
 
 
 class ExtremeValueMachine(SupervisedClassifier):
