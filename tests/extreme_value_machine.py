@@ -19,7 +19,9 @@ import torch
 class ToyClassify2D4Gaussians(object):
     """Create the generative sampling procedure for obtaining coordinates of
     points as feature data along with the label of which Gaussian distribution
-    they belong to.
+    they belong to. The Gaussian distributions are labeled their index which
+    starts at zero at the top most Gaussian centered at [0, 1] and labels the
+    rest that follow clockwise around the unit circle.
     """
     def __init__(self, locs=None, scales=0.5, labels=None):
         # TODO create PyTorch Gaussian Distributions at locs and scales
@@ -47,14 +49,25 @@ class ToyClassify2D4Gaussians(object):
         """Uniformly samples from all Gaussian Distributions returning the
         coordinates and label of their source distribution.
         """
+        return
 
     def equal_sample_n(num):
         """Equally samples from all Gaussian Distributions `num` times each
         returning the coordinates and label of their source distribution.
         """
+        return
+
 
 class TestEVMToyClassify2D4Gaussians(object):
-    """PyTest unit tests using the toy classification simulation."""
+    """PyTest unit tests using the toy classification simulation.
+
+    Attributes
+    ----------
+    features : torch.Tensor
+        The coordinates to be classified.
+    labels : torch.Tensor
+        The coordinates corresponding labels.
+    """
     def __init__(self):
         raise NotImplementedError()
         # TODO create toy simulation
