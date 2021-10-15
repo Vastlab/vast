@@ -46,6 +46,11 @@ class EVM1vsRest(object):
     extreme_vectors_indices : torch.Tensor
     weibulls : weibull
 
+    def __dict__(self):
+        """Dictionary version of these attributes."""
+        raise NotImplementedError()
+        return
+
     def predict(self, points):
         raise NotImplementedError(
             'This is not necessary atm, but is techinically possible to do.'
@@ -114,6 +119,15 @@ class EVM1vsRest(object):
         )
 
 
+@dataclass
+class EVMParams(object):
+    tailsize: float
+    cover_threshold: float
+    distance_multiplier: float
+    distance_metric: str = 'cosine'
+    chunk_size: int = 200
+
+
 class ExtremeValueMachine(SupervisedClassifier):
     """Object Oriented Programming wrapper for the existing EVM funtions. This
     provides an object that contains a single EVM instance and streamlines the
@@ -147,6 +161,14 @@ class ExtremeValueMachine(SupervisedClassifier):
     detection_threshold : float = None
         The threshold to apply to each sample's probability vector as an ad hoc
         solution to adjusting the MEVM's sensitivity to unknowns.
+
+    Notes
+    -----
+    This class and EVM1vsRest are an initial OOP wrapper for EVM_Training and
+    EVM_Inference such that the model is more easily managed. It may be
+    possible for this to be more efficient by being written more directly using
+    the PyTorch API. Adding the use of Ray where noted may aid the parallel
+    processing as well.
     """
     def __init__(
         self,
@@ -166,6 +188,24 @@ class ExtremeValueMachine(SupervisedClassifier):
         self._increment = 0
         self.device = torch.device(device)
 
+    @property
+    def _args(self):
+        """Property that obtains the `args` of the EVM as expected for input
+        into the vast.opensetAlgos.EVM.EVM_Train and EVM_Inference functions.
+
+        Returns
+        -------
+        dict()
+            A dictionary of the EVM's hyperparameters as used by vast package.
+        """
+        return EVMParams(
+            self.tail_size,
+            self.cover_threshold,
+            self.distance_multiplier,
+            self.distance_metric,
+            self.chunk_size,
+        )
+
     # TODO make this a ray function for easy parallelization.
     def fit(self, points, labels=None,  extra_negatives=None, init_fit=None):
         """Fit the model with the given data either as initial fit or increment.
@@ -178,13 +218,18 @@ class ExtremeValueMachine(SupervisedClassifier):
             The encoded labels as integers or a list of the unencoded labels
             that corresponds to the list of pytorch tensors in `points`.
         extra_negatives : torch.Tensor = None
+            Data points that will always serve as negative class samples for
+            ever EVM1vsRest. These are treated as unlabeled or unknown classes,
+            though may be classes that are known but just are not cared about
+            to be classified as known for the given classification task. For
+            example, for a classifier of dog breedss, one may happen to have
+            images of different cat breeds and even have their labels, but
+            their task is to classify dogs and detect when others are not dogs,
+            so all cat images are treated as extra negatives.
         init_fit : bool = None
             By default, the ExtremeValueMachine keeps track of the number of
             increments.
         """
-
-        # TODO point and label conversion
-
         # If points and labels are aligned sequence pair (X, y): adjust form
         if (
             isinstance(points, np.ndarray)
@@ -239,7 +284,7 @@ class ExtremeValueMachine(SupervisedClassifier):
 
     # TODO make this a ray function for easy parallelization.
     def _initial_fit(self, points, extra_negatives=None):
-        """Fits the
+        """Fits the EVM with the given points as if it is the first fitting.
 
         Args
         ----
@@ -247,15 +292,21 @@ class ExtremeValueMachine(SupervisedClassifier):
         labels : torch.Tensor | [str | int] = None
         extra_negatives : torch.Tensor = None
         """
-        EVM_Training(
+        evm_fit = EVM_Training(
             list(self.label_enc.encoder.inv),
             points,
-            args,
+            self._args,
             self.device,
-            models,
-        )
+        )[1]
 
-        #self.one_vs_rests =
+        self.one_vs_rests = {
+            one_vs_rest[0]: evm1vsrest(
+                one_vs_rest[1]['extreme_vectors'],
+                one_vs_rest[1]['extreme_vectors_indexes'],
+                one_vs_rest[1]['weibulls'],
+            )
+            for one_vs_rest in sorted(evm_fit, key=lambda x: x[0])
+        }
         self._increments = 1
 
     # TODO make this a ray function for easy parallelization.
@@ -267,7 +318,23 @@ class ExtremeValueMachine(SupervisedClassifier):
         labels : torch.Tensor | [str | int] = None
         extra_negatives : torch.Tensor = None
         """
-        #self.one_vs_rests =
+        # TODO figure out how to efficiently update a subset of the EVM1vsRests
+        evm_fit = EVM_Training(
+            list(self.label_enc.encoder.inv),
+            points,
+            self._args,
+            self.device,
+            {k: dict(v) for k, v in self.one_vs_rests.items()},
+        )[1]
+
+        self.one_vs_rests = {
+            one_vs_rest[0]: evm1vsrest(
+                one_vs_rest[1]['extreme_vectors'],
+                one_vs_rest[1]['extreme_vectors_indexes'],
+                one_vs_rest[1]['weibulls'],
+            )
+            for one_vs_rest in sorted(evm_fit, key=lambda x: x[0])
+        }
         self._increments += 1
 
     # TODO make this a ray function for easy parallelization. Lesser priority
@@ -275,24 +342,52 @@ class ExtremeValueMachine(SupervisedClassifier):
         """Predicts the 1 vs Rest class probabilities for the points. This
         vector does not sum to one!
         """
+        if not isinstance(points, torch.Tensor):
+            raise TypeError('expected `points` to be of type: torch.Tensor')
+
+        # TODO figure out how to make use of the efficient inference function.
+
         return EVM_Inference(
                 list(self.label_enc.encoder.inv),
                 points,
-                args,
+                self._args,
                 self.device,
-                self.one_vs_rests,
+                # Create the models as expected by EVM_Inference
+                {k: dict(v) for k, v in self.one_vs_rests.items()},
             )[1][1]
 
     def known_probs(self, points, gpu=None):
-        """Predicts known probability vector without the unknown class."""
+        """Predicts known probability vector without the unknown class.
+        Args
+        ----
+        points : torch.Tensor
+
+        Returns
+        -------
+        torch.Tensor
+            A torch tensor of a vector of probabilities per sample, including
+            an unknown class probability as the last dimension.
+        """
         probs = self.one_vs_rest_probs(points)
         return probs / probs.sum(1, True)
 
     # TODO make this a ray function for easy parallelization. Lesser priority
     def predict(self, points, unknown_last_dim=True):
-        """Wraps the MultipleEVM's class_probabilities and uses the encoder to
-        keep labels as expected by the user. Also adjusts the class
-        probabilities to include the unknown class.
+        """Predicts the probability vector of knowns and unknown per sample.
+
+        The resulting probability vector per sample is constructed such that
+        all EVM1vsRest binary classification probabilities are concatenated
+        into a vector and the unknown class probability is included, locaiton
+        depending on `unknown_last_dim`. The unknown class probability is the
+        inverse probability of the maximum known/positive probability from all
+        EVM1vsRest classifiers.
+
+        This unnormalized vector is then normalized by summing all of the
+        values in that vector and dividing them by that sum, otherwise known as
+        dividing the vector by L1 norm of that vector. This preserves the
+        ratios of the probabilities to one another. Remember that the negative
+        samples per EVM1vsRest includes the samples labeled as other classes,
+        which makes the EVM1vsRest dependent binary classifiers.
 
         Args
         ----
@@ -308,9 +403,6 @@ class ExtremeValueMachine(SupervisedClassifier):
             A torch tensor of a vector of probabilities per sample, including
             an unknown class probability as the last dimension.
         """
-        if not isinstance(points, torch.Tensor):
-            raise TypeError('expected `points` to be of type: torch.Tensor')
-
         probs = self.one_vs_rest_probs(points)
 
         # Find probability of unknown as 1 - max 1-vs-Rest and concat
