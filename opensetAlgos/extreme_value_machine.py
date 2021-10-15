@@ -114,7 +114,9 @@ class EVM1vsRest(object):
                 'signTensor': h5_weibulls['signTensor'][()],
                 'translateAmountTensor':
                     h5_weibulls['translateAmountTensor'][()],
-                'smallScoreTensor': torch.from_numpy(e['smallScore'][()]),
+                'smallScoreTensor': torch.from_numpy(
+                    h5_weibulls['smallScore'][()]
+                ),
             }),
         )
 
@@ -188,6 +190,12 @@ class ExtremeValueMachine(SupervisedClassifier):
         self._increment = 0
         self.device = torch.device(device)
 
+        self.tail_size = tail_size
+        self.cover_threshold = cover_threshold
+        self.distance_multiplier = distance_multiplier
+        self.distance_metric = distance_metric
+        self.chunk_size = chunk_size
+
     @property
     def _args(self):
         """Property that obtains the `args` of the EVM as expected for input
@@ -237,6 +245,7 @@ class ExtremeValueMachine(SupervisedClassifier):
             and len(points) == len(labels)
         ):
             # Adjust sequence pair into list of torch.Tensors and unique labels
+            # TODO handle np and torch versions.
             unique = np.unique(labels)
             labels = np.array(labels)
             points = [torch.Tensor(points[labels == u]) for u in unique]
@@ -328,7 +337,7 @@ class ExtremeValueMachine(SupervisedClassifier):
         )[1]
 
         self.one_vs_rests = {
-            one_vs_rest[0]: evm1vsrest(
+            one_vs_rest[0]: EVM1vsRest(
                 one_vs_rest[1]['extreme_vectors'],
                 one_vs_rest[1]['extreme_vectors_indexes'],
                 one_vs_rest[1]['weibulls'],
