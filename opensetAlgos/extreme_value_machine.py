@@ -158,13 +158,6 @@ class ExtremeValueMachine(SupervisedClassifier):
     device : torch.device = 'cuda'
         The torch device to compute fitting and predictions on.
 
-    max_unknowns : int = None
-        The total number of unknowns expected by the EVM, used when performing
-        incremental updates (currently not implemented in EVM).
-    detection_threshold : float = None
-        The threshold to apply to each sample's probability vector as an ad hoc
-        solution to adjusting the MEVM's sensitivity to unknowns.
-
     Notes
     -----
     This class and EVM1vsRest are an initial OOP wrapper for EVM_Training and
@@ -191,6 +184,12 @@ class ExtremeValueMachine(SupervisedClassifier):
         self.one_vs_rests = None
         self._increment = 0
         self.device = torch.device(device)
+
+        # TODO replace hotfix with upstream change for support for torch.device
+        if self.device.index is None:
+            raise ValueError(
+                'Upstream `vast` only supports indexed cuda torch devices'
+            )
 
         self.tail_size = tail_size
         if tail_size_is_ratio:
@@ -315,7 +314,7 @@ class ExtremeValueMachine(SupervisedClassifier):
             list(self.label_enc.encoder.inv),
             points,
             self._args,
-            self.device,
+            self.device.index,
         )[1]
 
         self.one_vs_rests = {
@@ -342,7 +341,7 @@ class ExtremeValueMachine(SupervisedClassifier):
             list(self.label_enc.encoder.inv),
             points,
             self._args,
-            self.device,
+            self.device.index,
             {k: dict(v) for k, v in self.one_vs_rests.items()},
         )[1]
 
@@ -370,7 +369,7 @@ class ExtremeValueMachine(SupervisedClassifier):
                 list(self.label_enc.encoder.inv),
                 points,
                 self._args,
-                self.device,
+                self.device.index,
                 # Create the models as expected by EVM_Inference
                 {k: dict(v) for k, v in self.one_vs_rests.items()},
             )[1][1]
