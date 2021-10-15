@@ -24,8 +24,9 @@ from vast.DistributionModels.weibull import weibull
 class EVM1vsRest(object):
     """A single 1 vs Rest classifier for a known class in the EVM model. This
     class is not intended to be used on its own during inference time, as it is
-    a only a part of the rest of the EVM. As such, this excludes the
-    hyperparameters of the EVM.
+    only a part of the rest of the EVM. As such, this excludes the
+    hyperparameters of the EVM to avoid redundancy and serves mostly as a
+    struct with save and load methods.
 
     Attributes
     ----------
@@ -96,17 +97,18 @@ class EVM1vsRest(object):
             h5 = h5py.File(h5, 'r')
 
         # TODO rm translateAmountTensor as it is depract in current weibull
+        h5_weibulls = h5['weibulls']
 
         # Load extreme_vectors, extreme_vectors_indices, and weibulls
         return EVM1vsRest(
             torch.tensor(h5['extreme_vectors'][()]),
             torch.tensor(h5['extreme_vectors_indices'][()]),
             weibull({
-                'Scale': torch.from_numpy(h5['weibulls']['Scale'][()]),
-                'Shape': torch.from_numpy(h5['weibulls']['Shape'][()]),
-                'signTensor': h5['weibulls']['signTensor'][()],
+                'Scale': torch.from_numpy(h5_weibulls['Scale'][()]),
+                'Shape': torch.from_numpy(h5_weibulls['Shape'][()]),
+                'signTensor': h5_weibulls['signTensor'][()],
                 'translateAmountTensor':
-                    h5['weibulls']['translateAmountTensor'][()],
+                    h5_weibulls['translateAmountTensor'][()],
                 'smallScoreTensor': torch.from_numpy(e['smallScore'][()]),
             }),
         )
