@@ -220,6 +220,10 @@ class ExtremeValueMachine(SupervisedClassifier):
             self.chunk_size,
         )
 
+    @property
+    def get_increment(self):
+        return self._increment
+
     # TODO make this a ray function for easy parallelization.
     def fit(self, points, labels=None,  extra_negatives=None, init_fit=None):
         """Fit the model with the given data either as initial fit or increment.
@@ -436,7 +440,9 @@ class ExtremeValueMachine(SupervisedClassifier):
         """Saves the EVM model as H5DF to disk with the labels and parameters.
         """
         if self.one_vs_rests is None:
-            raise RuntimeError("The model has not been trained yet.")
+            raise RuntimeError(
+                "The ExtremeValueMachine has not been trained yet."
+            )
 
         # Open file for writing; create if not existent and avoid overwriting.
         if isinstance(h5, str):
