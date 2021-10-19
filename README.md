@@ -4,7 +4,7 @@ Vision And Security Technology (VAST) Lab.
 
 ## Setup
 ### For users
-`pip install git+https://github.com/vast/vast.git`
+`pip install git+https://github.com/Vastlab/vast.git`
 ### For developers
 `git clone --recurse-submodules https://github.com/Vastlab/vast.git`
 
