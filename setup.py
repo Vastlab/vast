@@ -46,7 +46,7 @@ setup(
     long_description_content_type="text/markdown",
     install_requires=requirements,
     packages=setuptools.find_packages(),
-    url="https://github.com/akshay-raj-dhamija/vast",
+    url="https://github.com/Vastlab/vast",
     cmdclass={
         "install": PostInstallCommand,
     },
