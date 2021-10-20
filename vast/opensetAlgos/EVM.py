@@ -234,7 +234,7 @@ def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, model
         yield ("probs", (pos_cls_name, probs))
 
 
-class EVM_Inference_simple_cpu:
+class EVM_Inference_cpu_max_knowness_prob:
     def __init__(self, distance_metric, models):
         combined_weibull_model = {}
         combined_weibull_model["Scale"] = []
