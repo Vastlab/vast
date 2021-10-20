@@ -1,0 +1,9 @@
+cff-version: 0.0.1
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Dhamija"
+  given-names: "Akshay"
+title: "Various Algorithms & Software Tools (VAST)"
+version: 0.0.1
+date-released: 2021-10-19
+url: "https://github.com/Vastlab/vast"
