@@ -233,39 +233,56 @@ def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, model
         probs = torch.stack(probs, dim=-1).cpu()
         yield ("probs", (pos_cls_name, probs))
 
-     
+
 class EVM_Inference_simple_cpu:
     def __init__(self, distance_metric, models):
-        combined_weibull_model={}
-        combined_weibull_model['Scale']=[]
-        combined_weibull_model['Shape']=[]
-        combined_weibull_model['smallScoreTensor']=[]
+        combined_weibull_model = {}
+        combined_weibull_model["Scale"] = []
+        combined_weibull_model["Shape"] = []
+        combined_weibull_model["smallScoreTensor"] = []
 
-        combined_extreme_vectors=[]
+        combined_extreme_vectors = []
 
         for cls_no, cls_name in enumerate(sorted(models.keys())):
-            models[cls_name]['weibulls'].tocpu()
-            weibull_params_current_cls = models[cls_name]['weibulls'].return_all_parameters()
-            combined_weibull_model['Scale'].extend(weibull_params_current_cls['Scale'].tolist())
-            combined_weibull_model['Shape'].extend(weibull_params_current_cls['Shape'].tolist())
-            combined_weibull_model['smallScoreTensor'].extend(weibull_params_current_cls['smallScoreTensor'].tolist())
-            combined_extreme_vectors.extend(models[cls_name]['extreme_vectors'].cpu().tolist())
+            models[cls_name]["weibulls"].tocpu()
+            weibull_params_current_cls = models[cls_name][
+                "weibulls"
+            ].return_all_parameters()
+            combined_weibull_model["Scale"].extend(
+                weibull_params_current_cls["Scale"].tolist()
+            )
+            combined_weibull_model["Shape"].extend(
+                weibull_params_current_cls["Shape"].tolist()
+            )
+            combined_weibull_model["smallScoreTensor"].extend(
+                weibull_params_current_cls["smallScoreTensor"].tolist()
+            )
+            combined_extreme_vectors.extend(
+                models[cls_name]["extreme_vectors"].cpu().tolist()
+            )
         # Only taking the last available values for signTensor and translateAmountTensor
-        combined_weibull_model['signTensor']=weibull_params_current_cls['signTensor']
-        combined_weibull_model['translateAmountTensor']=weibull_params_current_cls['translateAmountTensor']
-        combined_weibull_model['Scale']=torch.tensor(combined_weibull_model['Scale'])
-        combined_weibull_model['Shape']=torch.tensor(combined_weibull_model['Shape'])
-        combined_weibull_model['smallScoreTensor']=torch.tensor(combined_weibull_model['smallScoreTensor'])
-        combined_extreme_vectors=torch.tensor(combined_extreme_vectors, dtype=torch.float64)
+        combined_weibull_model["signTensor"] = weibull_params_current_cls["signTensor"]
+        combined_weibull_model["translateAmountTensor"] = weibull_params_current_cls[
+            "translateAmountTensor"
+        ]
+        combined_weibull_model["Scale"] = torch.tensor(combined_weibull_model["Scale"])
+        combined_weibull_model["Shape"] = torch.tensor(combined_weibull_model["Shape"])
+        combined_weibull_model["smallScoreTensor"] = torch.tensor(
+            combined_weibull_model["smallScoreTensor"]
+        )
+        combined_extreme_vectors = torch.tensor(
+            combined_extreme_vectors, dtype=torch.float64
+        )
 
-        self.combined_model={}
-        self.combined_model['weibulls'] = weibull.weibull(combined_weibull_model)
-        self.combined_model['extreme_vectors'] = combined_extreme_vectors
-        
+        self.combined_model = {}
+        self.combined_model["weibulls"] = weibull.weibull(combined_weibull_model)
+        self.combined_model["extreme_vectors"] = combined_extreme_vectors
+
         self.distance_metric = distance_metric
-        
+
     def __call__(self, sample_to_process):
-        distances = pairwisedistances.__dict__[self.distance_metric](sample_to_process[None,:],
-                                                                     self.combined_model['extreme_vectors'])
-        probs = torch.max(self.combined_model['weibulls'].wscore(distances), dim=1).values
+        distances = pairwisedistances.__dict__[self.distance_metric](
+            sample_to_process[None, :], self.combined_model["extreme_vectors"]
+        )
+        probs = torch.max(self.combined_model["weibulls"].wscore(distances), dim=1).values
         return probs
