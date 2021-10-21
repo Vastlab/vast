@@ -3,6 +3,3 @@ h5py
 numpy
 matplotlib
 termcolor
-pre-commit
-black
-flake8
