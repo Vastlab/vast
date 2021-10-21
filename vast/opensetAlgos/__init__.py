@@ -8,6 +8,7 @@ __all__ = [
     "EVM_Params",
     "EVM_Training",
     "EVM_Inference",
+    "EVM_Inference_cpu_max_knowness_prob",
 ]
 from .openmax import *
 from .EVM import *
