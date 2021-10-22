@@ -361,10 +361,10 @@ class ExtremeValueMachine(SupervisedClassifier):
         # Same thing as initial fit but it should be more flexible.
         evm_fit = EVM_Training(
             list(self.label_enc.encoder.inv),
-            points,
+            {i: pts for i, pts in enumerate(points)},
             self._args,
             self.device.index,
-            {k: dict(v) for k, v in self.one_vs_rests.items()},
+            {k: vars(v) for k, v in self.one_vs_rests.items()},
         )
 
         self.one_vs_rests = {
@@ -386,17 +386,20 @@ class ExtremeValueMachine(SupervisedClassifier):
             raise TypeError("expected `points` to be of type: torch.Tensor")
 
         # TODO figure out how to make use of the efficient inference function.
-
-        evm_inf = EVM_Inference(
-            list(self.label_enc.encoder.inv),
-            points,
-            self._args,
-            self.device.index,
-            # Create the models as expected by EVM_Inference
-            {k: vars(v) for k, v in self.one_vs_rests.items()},
-        )
-
-        return {pred[1][0]: pred[1][1] for pred in evm_inf}
+        # TODO this currently only uses 1 batch, rather than efficient or user
+        # defined bathces. So this need changed but it should run for now.
+        # pos_cls_name in EVM_Inference is actually the batch ID. So keys are
+        # batch ids and values are the tensors of the different batches.
+        return next(
+            EVM_Inference(
+                ["batch"],
+                {"batch": points},
+                self._args,
+                self.device.index,
+                # Create the models as expected by EVM_Inference
+                {k: vars(v) for k, v in self.one_vs_rests.items()},
+            )
+        )[1][1]
 
     def known_probs(self, points, gpu=None):
         """Predicts known probability vector without the unknown class.
@@ -488,7 +491,7 @@ class ExtremeValueMachine(SupervisedClassifier):
         for attrib in [
             "tail_size",
             "cover_threshold",
-            "distance_function",
+            "distance_metric",
             "distance_multiplier",
             "chunk_size",
             "_increments",
@@ -497,7 +500,13 @@ class ExtremeValueMachine(SupervisedClassifier):
             h5.attrs[attrib] = getattr(self, attrib)
 
     @staticmethod
-    def load(h5, labels=None, labels_dtype=None, train_hyperparams=None):
+    def load(
+        h5,
+        labels=None,
+        labels_dtype=None,
+        train_hyperparams=None,
+        device="cuda",
+    ):
         """Performs the same load functionality as in MultipleEVM but loads the
         ordered labels from the h5 file for the label encoder and other
         hyperparameters if they are present.
@@ -543,7 +552,7 @@ class ExtremeValueMachine(SupervisedClassifier):
             train_hyperparams = [
                 "tail_size",
                 "cover_threshold",
-                "distance_function",
+                "distance_metric",
                 "distance_multiplier",
                 "chunk_size",
                 "_increments",
@@ -565,8 +574,14 @@ class ExtremeValueMachine(SupervisedClassifier):
             )
 
         _increments = train_hyperparams.pop("_increments")
-        evm = ExtremeValueMachine(labels=labels, **train_hyperparams)
+        tail_size_int = train_hyperparams.pop("tail_size_int")
+        evm = ExtremeValueMachine(
+            labels=labels,
+            device=device,
+            **train_hyperparams,
+        )
         evm.one_vs_rests = one_vs_rests
         evm._increments = _increments
+        evm.tail_size_int = tail_size_int
 
         return evm

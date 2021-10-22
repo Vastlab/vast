@@ -11,7 +11,7 @@ class ToyClassify2D4MVNs(object):
     rest that follow clockwise around the unit circle.
     """
 
-    def __init__(self, locs=None, scales=0.5, labels=None, seed=None):
+    def __init__(self, locs=None, scales=0.2, labels=None, seed=None):
         # TODO create PyTorch Gaussian Distributions at locs and scales
         if locs is None:
             locs = [[1, 0], [0, 1], [-1, 0], [0, -1]]
@@ -79,4 +79,34 @@ evm.fit(train_features, train_labels)
 # Generate Test samples
 test_features, test_labels = toy_sim.eq_sample_n(test_num_each)
 
-preds = evm.predict(test_features)
+# preds = evm.predict(test_features)
+
+kpreds = evm.known_probs(test_features)
+print((kpreds.argmax(1) == test_labels).sum().tolist() / len(test_labels))
+
+# Generate the train samples
+inc_train_features, inc_train_labels = toy_sim.eq_sample_n(inc_train_num_each)
+
+# Append the new train samples to the old samples
+train_features = torch.cat([train_features, inc_train_features])
+train_labels = torch.cat([train_labels, inc_train_labels])
+
+# Incremental fit by keeping prior points
+evm.fit(train_features, train_labels)
+
+# Check increment value == 2
+assert evm.get_increment == 2
+
+# Generate the incremental test samples
+inc_test_features, inc_test_labels = toy_sim.eq_sample_n(
+    inc_test_num_each,
+)
+
+# Append the new test samples to the old samples
+test_features = torch.cat([test_features, inc_test_features])
+test_labels = torch.cat([test_labels, inc_test_labels])
+
+# preds = evm.predict(test_features)
+
+kpreds = evm.known_probs(test_features)
+print((kpreds.argmax(1) == test_labels).sum().tolist() / len(test_labels))
