@@ -34,7 +34,7 @@ computation may have slight variations.
 
 ### Tools
 1. [Concatenate multiple torch datasets](vast/tools/ConcatDataset.py) Useful for openset learning.
-2. [Feature Extraction](standAloneTools/FeatureExtractors) to HDF5 file from a specific layer of a pytorch model
+2. [Feature Extraction](vast/scripts/FeatureExtractors) to HDF5 file from a specific layer of a pytorch model
 3. [Multiprocessing Logger](vast/tools/logger.py)
 
 ### Visualization
