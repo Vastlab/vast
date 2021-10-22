@@ -110,3 +110,34 @@ test_labels = torch.cat([test_labels, inc_test_labels])
 
 kpreds = evm.known_probs(test_features)
 print((kpreds.argmax(1) == test_labels).sum().tolist() / len(test_labels))
+
+"""
+# To visualize the results:
+import pandas as pd
+
+df = pd.DataFrame(test_features.tolist(),columns=['x','y'])
+df['label'] = test_labels.tolist()
+df['pred'] = kpreds.argmax(1).tolist()
+
+import plotly.express as px
+
+fig = px.scatter(
+    df,
+    x='x',
+    y='y',
+    color='label',
+    symbol='label',
+)
+
+fig.show()
+
+fig = px.scatter(
+    df,
+    x='x',
+    y='yi
+    color='pred',
+    symbol='pred',
+)
+
+fig.show()
+"""
