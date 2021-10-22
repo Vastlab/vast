@@ -54,13 +54,15 @@ class ToyClassify2D4MVNs(object):
                 torch.cat([
                     mvn.sample_n(num) for mvn in self.mvns
                 ])[idx],
-                torch.Tensor([i] * num for i in range(len(self.mvns)))[idx]
+                torch.Tensor(
+                    [[i] * num for i in range(len(self.mvns))]
+                ).flatten()[idx]
             )
         return (
             torch.cat([
                 mvn.sample_n(num) for mvn in self.mvns
             ]),
-            torch.Tensor([i] * num for i in range(len(self.mvns))),
+            torch.Tensor([[i] * num for i in range(len(self.mvns))]).flatten(),
         )
 
 
@@ -84,6 +86,9 @@ class TestEVMToyClassify2D4MVNs(object):
     """
     def setup(self, seed=0, device='cuda:0'):
         """The setup for all tests in this class."""
+        # Set seed: Seems I cannot carry an individual RNG easily...
+        torch.manual_seed(seed)
+
         # Create toy simulation
         toy_sim = ToyClassify2D4MVNs(seed=seed)
 
