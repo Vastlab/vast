@@ -20,6 +20,7 @@ from exputils.io import create_filepath
 from vast.opensetAlgos.EVM import EVM_Training, EVM_Inference
 from vast.DistributionModels.weibull import weibull
 
+
 @dataclass
 class EVM1vsRest(object):
     """A single 1 vs Rest classifier for a known class in the EVM model. This
@@ -41,57 +42,58 @@ class EVM1vsRest(object):
         The output of `weibulls.return_all_parameters()` combined with the
         `extreme_vectors` is the EVM 1vsRest for one class (This class).
     """
-    # TODO consider saving EVM attribs in the EVM1vsRest. Redundant though.
-    extreme_vectors : torch.Tensor
-    extreme_vectors_indices : torch.Tensor
-    weibulls : weibull
 
-    def __dict__(self):
-        """Dictionary version of these attributes."""
-        raise NotImplementedError()
-        return
+    # TODO consider saving EVM attribs in the EVM1vsRest. Redundant though.
+    extreme_vectors: torch.Tensor
+    extreme_vectors_indices: torch.Tensor
+    weibulls: weibull
+
+    # def __dict__(self):
+    #    """Dictionary version of these attributes."""
+    #    raise NotImplementedError()
+    #    return
 
     def predict(self, points):
         raise NotImplementedError(
-            'This is not necessary atm, but is techinically possible to do.'
+            "This is not necessary atm, but is techinically possible to do."
         )
         return
 
     def fit(self, points):
         raise NotImplementedError(
-            'This is not necessary atm, but is techinically possible to do.'
+            "This is not necessary atm, but is techinically possible to do."
         )
 
     def save(self, h5, overwrite=False):
         """Save the model within the given H5DF file."""
         # Open file for writing; create if not existent and avoid overwriting.
         if isinstance(h5, str):
-            h5 = h5py.File(create_filepath(h5, overwrite), 'w')
+            h5 = h5py.File(create_filepath(h5, overwrite), "w")
 
         # Save extreme vectors
-        h5.create_dataset('extreme_vectors', data=self.extreme_vectors.cpu())
+        h5.create_dataset("extreme_vectors", data=self.extreme_vectors.cpu())
 
         # Save extreme vectors indices
         h5.create_dataset(
-            'extreme_vectors_indices',
+            "extreme_vectors_indices",
             data=self.extreme_vectors_indices.cpu(),
         )
 
         # Save weibulls
-        h5_weibulls = h5.create_group('weibulls')
+        h5_weibulls = h5.create_group("weibulls")
         params = self.weibulls.return_all_parameters()
 
-        h5_weibulls.create_dataset('Scale',data=params['Scale'].cpu())
-        h5_weibulls.create_dataset('Shape',data=params['Shape'].cpu())
-        h5_weibulls.create_dataset('signTensor',data=params['signTensor'])
+        h5_weibulls.create_dataset("Scale", data=params["Scale"].cpu())
+        h5_weibulls.create_dataset("Shape", data=params["Shape"].cpu())
+        h5_weibulls.create_dataset("signTensor", data=params["signTensor"])
         # TODO rm translateAmountTensor as it is depract in current weibull
         h5_weibulls.create_dataset(
-            'translateAmountTensor',
-            data=params['translateAmountTensor'],
+            "translateAmountTensor",
+            data=params["translateAmountTensor"],
         )
         h5_weibulls.create_dataset(
-            'smallScore',
-            data=params['smallScoreTensor'].cpu(),
+            "smallScore",
+            data=params["smallScoreTensor"].cpu(),
         )
 
     @staticmethod
@@ -99,25 +101,24 @@ class EVM1vsRest(object):
         """Load the model from the given H5DF file."""
         # Open the H5DF for reading
         if isinstance(h5, str):
-            h5 = h5py.File(h5, 'r')
+            h5 = h5py.File(h5, "r")
 
         # TODO rm translateAmountTensor as it is depract in current weibull
-        h5_weibulls = h5['weibulls']
+        h5_weibulls = h5["weibulls"]
 
         # Load extreme_vectors, extreme_vectors_indices, and weibulls
         return EVM1vsRest(
-            torch.tensor(h5['extreme_vectors'][()]),
-            torch.tensor(h5['extreme_vectors_indices'][()]),
-            weibull({
-                'Scale': torch.from_numpy(h5_weibulls['Scale'][()]),
-                'Shape': torch.from_numpy(h5_weibulls['Shape'][()]),
-                'signTensor': h5_weibulls['signTensor'][()],
-                'translateAmountTensor':
-                    h5_weibulls['translateAmountTensor'][()],
-                'smallScoreTensor': torch.from_numpy(
-                    h5_weibulls['smallScore'][()]
-                ),
-            }),
+            torch.tensor(h5["extreme_vectors"][()]),
+            torch.tensor(h5["extreme_vectors_indices"][()]),
+            weibull(
+                {
+                    "Scale": torch.from_numpy(h5_weibulls["Scale"][()]),
+                    "Shape": torch.from_numpy(h5_weibulls["Shape"][()]),
+                    "signTensor": h5_weibulls["signTensor"][()],
+                    "translateAmountTensor": h5_weibulls["translateAmountTensor"][()],
+                    "smallScoreTensor": torch.from_numpy(h5_weibulls["smallScore"][()]),
+                }
+            ),
         )
 
 
@@ -126,8 +127,9 @@ class EVMParams(object):
     tailsize: float
     cover_threshold: float
     distance_multiplier: float
-    distance_metric: str = 'cosine'
+    distance_metric: str = "cosine"
     chunk_size: int = 200
+    # TODO note the EVM_funcs expect these all to be in lists... Or just tailsize..
 
 
 class ExtremeValueMachine(SupervisedClassifier):
@@ -166,15 +168,16 @@ class ExtremeValueMachine(SupervisedClassifier):
     the PyTorch API. Adding the use of Ray where noted may aid the parallel
     processing as well.
     """
+
     def __init__(
         self,
         tail_size,
         cover_threshold,
         distance_multiplier,
         labels,
-        distance_metric='cosine',
+        distance_metric="cosine",
         chunk_size=200,
-        device='cuda',
+        device="cuda",
         tail_size_is_ratio=True,
         *args,
         **kwargs,
@@ -182,14 +185,12 @@ class ExtremeValueMachine(SupervisedClassifier):
         # Create a NominalDataEncoder to handle the class encodings
         super(ExtremeValueMachine, self).__init__(labels, *args, **kwargs)
         self.one_vs_rests = None
-        self._increment = 0
+        self._increments = 0
         self.device = torch.device(device)
 
         # TODO replace hotfix with upstream change for support for torch.device
         if self.device.index is None:
-            raise ValueError(
-                'Upstream `vast` only supports indexed cuda torch devices'
-            )
+            raise ValueError("Upstream `vast` only supports indexed cuda torch devices")
 
         self.tail_size = tail_size
         if tail_size_is_ratio:
@@ -212,20 +213,21 @@ class ExtremeValueMachine(SupervisedClassifier):
         dict()
             A dictionary of the EVM's hyperparameters as used by vast package.
         """
+        # NOTE EVM_funcs expect iterables for all these...
         return EVMParams(
-            self.tail_size_int,
-            self.cover_threshold,
-            self.distance_multiplier,
+            [self.tail_size_int],
+            [self.cover_threshold],
+            [self.distance_multiplier],
             self.distance_metric,
             self.chunk_size,
         )
 
     @property
     def get_increment(self):
-        return self._increment
+        return self._increments
 
     # TODO make this a ray function for easy parallelization.
-    def fit(self, points, labels=None,  extra_negatives=None, init_fit=None):
+    def fit(self, points, labels=None, extra_negatives=None, init_fit=None):
         """Fit the model with the given data either as initial fit or increment.
         Defaults to incremental fitting.
 
@@ -260,45 +262,60 @@ class ExtremeValueMachine(SupervisedClassifier):
             labels = np.array(labels)
             points = [torch.Tensor(points[labels == u]) for u in unique]
             labels = unique
+        elif (
+            isinstance(points, torch.Tensor)
+            and (isinstance(labels, list) or isinstance(labels, torch.Tensor))
+            and len(points) == len(labels)
+        ):
+            labels = torch.Tensor(labels)
+            unique = torch.unique(labels)
+            points = [points[labels == u] for u in unique]
         elif isinstance(points, list):
             if all([isinstance(pts, np.ndarray) for pts in points]):
                 # If list of np.ndarrays, turn into torch.Tensors
                 points = [torch.Tensor(pts) for pts in points]
             elif not all([isinstance(pts, torch.Tensor) for pts in points]):
-                raise TypeError(' '.join([
-                    'expected points to be of types: list(np.ndarray),',
-                    'list(torch.tensor), or np.ndarray with labels as an',
-                    'aligned list or np.ndarray',
-                ]))
+                raise TypeError(
+                    " ".join(
+                        [
+                            "expected points to be of types: list(np.ndarray),",
+                            "list(torch.tensor), or np.ndarray with labels as an",
+                            "aligned list or np.ndarray",
+                        ]
+                    )
+                )
         else:
-            raise TypeError(' '.join([
-                'expected points to be of types: list(np.ndarray),',
-                'list(torch.Tensor), or (np.ndarray torch.Tensor) with labels',
-                'as an aligned (list or np.ndarray)',
-            ]))
+            raise TypeError(
+                " ".join(
+                    [
+                        "expected points to be of types: list(np.ndarray),",
+                        "list(torch.Tensor), or (np.ndarray torch.Tensor) with labels",
+                        "as an aligned (list or np.ndarray)",
+                    ]
+                )
+            )
 
         # Ensure extra_negatives is of expected form (no labels for these)
         if (
-            (
-                isinstance(extra_negatives, np.ndarray)
-                and len(extra_negatives.shape) == 2
-            )
-            or isinstance(extra_negatives, list)
-        ):
+            isinstance(extra_negatives, np.ndarray) and len(extra_negatives.shape) == 2
+        ) or isinstance(extra_negatives, list):
             extra_negatives = torch.Tensor(extra_negatives)
-        elif not (
-            isinstance(extra_negatives, torch.Tensor)
-            and len(extra_negatives.shape) == 2
+        elif extra_negatives is not None and not (
+            isinstance(extra_negatives, torch.Tensor) and len(extra_negatives.shape) == 2
         ):
-            raise TypeError(' '.join([
-                'The extra_negatives must be either None, torch.Tensor of',
-                'shape 2, or an object broadcastable to such a torch.Tensor.',
-                f'But recieved type `{type(extra_negatives)}`.',
-            ]))
+            raise TypeError(
+                " ".join(
+                    [
+                        "The extra_negatives must be either None, torch.Tensor of",
+                        "shape 2, or an object broadcastable to such a torch.Tensor.",
+                        f"But recieved type `{type(extra_negatives)}`.",
+                    ]
+                )
+            )
 
-        if init_fit or (init_fit is None and self._increment == 0):
+        if init_fit or (init_fit is None and self._increments == 0):
             self._initial_fit(points, extra_negatives)
-        else: # Incremental fit
+        else:  # Incremental fit
             self._increment_fit(points, extra_negatives)
 
     # TODO make this a ray function for easy parallelization.
@@ -316,18 +333,18 @@ class ExtremeValueMachine(SupervisedClassifier):
 
         evm_fit = EVM_Training(
             list(self.label_enc.encoder.inv),
-            points,
+            {i: pts for i, pts in enumerate(points)},
             self._args,
             self.device.index,
-        )[1]
+        )
 
         self.one_vs_rests = {
-            one_vs_rest[0]: EVM1vsRest(
-                one_vs_rest[1]['extreme_vectors'],
-                one_vs_rest[1]['extreme_vectors_indexes'],
-                one_vs_rest[1]['weibulls'],
+            one_vs_rest[1][0]: EVM1vsRest(
+                one_vs_rest[1][1]["extreme_vectors"],
+                one_vs_rest[1][1]["extreme_vectors_indexes"],
+                one_vs_rest[1][1]["weibulls"],
             )
-            for one_vs_rest in sorted(evm_fit, key=lambda x: x[0])
+            for one_vs_rest in evm_fit
         }
         self._increments = 1
 
@@ -341,21 +358,22 @@ class ExtremeValueMachine(SupervisedClassifier):
         extra_negatives : torch.Tensor = None
         """
         # TODO figure out how to efficiently update a subset of the EVM1vsRests
+        # Same thing as initial fit but it should be more flexible.
         evm_fit = EVM_Training(
             list(self.label_enc.encoder.inv),
             points,
             self._args,
             self.device.index,
             {k: dict(v) for k, v in self.one_vs_rests.items()},
-        )[1]
+        )
 
         self.one_vs_rests = {
-            one_vs_rest[0]: EVM1vsRest(
-                one_vs_rest[1]['extreme_vectors'],
-                one_vs_rest[1]['extreme_vectors_indexes'],
-                one_vs_rest[1]['weibulls'],
+            one_vs_rest[1][0]: EVM1vsRest(
+                one_vs_rest[1][1]["extreme_vectors"],
+                one_vs_rest[1][1]["extreme_vectors_indexes"],
+                one_vs_rest[1][1]["weibulls"],
             )
-            for one_vs_rest in sorted(evm_fit, key=lambda x: x[0])
+            for one_vs_rest in evm_fit
         }
         self._increments += 1
 
@@ -365,18 +383,20 @@ class ExtremeValueMachine(SupervisedClassifier):
         vector does not sum to one!
         """
         if not isinstance(points, torch.Tensor):
-            raise TypeError('expected `points` to be of type: torch.Tensor')
+            raise TypeError("expected `points` to be of type: torch.Tensor")
 
         # TODO figure out how to make use of the efficient inference function.
 
-        return EVM_Inference(
-                list(self.label_enc.encoder.inv),
-                points,
-                self._args,
-                self.device.index,
-                # Create the models as expected by EVM_Inference
-                {k: dict(v) for k, v in self.one_vs_rests.items()},
-            )[1][1]
+        evm_inf = EVM_Inference(
+            list(self.label_enc.encoder.inv),
+            points,
+            self._args,
+            self.device.index,
+            # Create the models as expected by EVM_Inference
+            {k: vars(v) for k, v in self.one_vs_rests.items()},
+        )
+
+        return {pred[1][0]: pred[1][1] for pred in evm_inf}
 
     def known_probs(self, points, gpu=None):
         """Predicts known probability vector without the unknown class.
@@ -437,45 +457,42 @@ class ExtremeValueMachine(SupervisedClassifier):
         return probs / probs.sum(1, True)
 
     def save(self, h5, overwrite=False):
-        """Saves the EVM model as H5DF to disk with the labels and parameters.
-        """
+        """Saves the EVM model as H5DF to disk with the labels and parameters."""
         if self.one_vs_rests is None:
-            raise RuntimeError(
-                "The ExtremeValueMachine has not been trained yet."
-            )
+            raise RuntimeError("The ExtremeValueMachine has not been trained yet.")
 
         # Open file for writing; create if not existent and avoid overwriting.
         if isinstance(h5, str):
-            h5 = h5py.File(create_filepath(h5, overwrite), 'w')
+            h5 = h5py.File(create_filepath(h5, overwrite), "w")
 
         # Save the EVMs
         for idx, one_vs_rest in self.one_vs_rests.items():
-            one_vs_rest.save(h5.create_group(f'EVM1vsRest-{idx}'))
+            one_vs_rest.save(h5.create_group(f"EVM1vsRest-{idx}"))
 
         # Save the labels for the encoder
         labels = self.labels
-        h5.attrs['labels_dtype'] = str(labels.dtype)
+        h5.attrs["labels_dtype"] = str(labels.dtype)
 
         # NOTE This does not save the encoding of the class if diff from [0,
         # len(labels)]!!!!!! Order is preserved though.
         if labels.dtype.type is np.str_ or labels.dtype.type is np.string_:
             h5.create_dataset(
-                'labels',
+                "labels",
                 data=labels.astype(object),
                 dtype=h5py.special_dtype(vlen=str),
             )
         else:
-            h5['labels'] = labels
+            h5["labels"] = labels
 
         # Write hyperparameters
         for attrib in [
-            'tail_size',
-            'cover_threshold',
-            'distance_function',
-            'distance_multiplier',
-            'chunk_size',
-            '_increments',
-            'tail_size_int',
+            "tail_size",
+            "cover_threshold",
+            "distance_function",
+            "distance_multiplier",
+            "chunk_size",
+            "_increments",
+            "tail_size_int",
         ]:
             h5.attrs[attrib] = getattr(self, attrib)
 
@@ -486,57 +503,68 @@ class ExtremeValueMachine(SupervisedClassifier):
         hyperparameters if they are present.
         """
         if isinstance(h5, str):
-            h5 = h5py.File(h5, 'r')
+            h5 = h5py.File(h5, "r")
 
         # Load the ordered labels into the NominalDataEncoder
-        if 'labels' in h5.keys():
+        if "labels" in h5.keys():
             if labels is not None:
-                logging.info(' '.join([
-                    '`labels` key exists in the HDF5 MEVM state file, but',
-                    'labels was given explicitly to `load()`. Ignoring the',
-                    'labels in the HDF5 file.',
-                ]))
+                logging.info(
+                    " ".join(
+                        [
+                            "`labels` key exists in the HDF5 MEVM state file, but",
+                            "labels was given explicitly to `load()`. Ignoring the",
+                            "labels in the HDF5 file.",
+                        ]
+                    )
+                )
             else:
                 if labels_dtype is None:
-                    labels_dtype = np.dtype(h5.attrs['labels_dtype'])
-                labels = h5['labels'][:].astype(labels_dtype)
+                    labels_dtype = np.dtype(h5.attrs["labels_dtype"])
+                labels = h5["labels"][:].astype(labels_dtype)
         elif labels is None:
-            raise KeyError(' '.join([
-                'No `labels` dataset available in given hdf5.',
-                'and `labels` parameter is None',
-            ]))
+            raise KeyError(
+                " ".join(
+                    [
+                        "No `labels` dataset available in given hdf5.",
+                        "and `labels` parameter is None",
+                    ]
+                )
+            )
 
         # Load the EVM1vsRest models
         one_vs_rests = {}
         for i, label in enumerate(labels):
-            if f'EVM1vsRest-{i}' in h5.keys():
-                one_vs_rests[i] = EVM1vsRest.load(h5[f'EVM1vsRest-{i}'])
+            if f"EVM1vsRest-{i}" in h5.keys():
+                one_vs_rests[i] = EVM1vsRest.load(h5[f"EVM1vsRest-{i}"])
 
         # Load training vars if not given
         if train_hyperparams is None:
             # NOTE Able to specify which to load from h5 by passing a list.
             train_hyperparams = [
-                'tail_size',
-                'cover_threshold',
-                'distance_function',
-                'distance_multiplier',
-                'chunk_size',
-                '_increments',
-                'tail_size_int',
+                "tail_size",
+                "cover_threshold",
+                "distance_function",
+                "distance_multiplier",
+                "chunk_size",
+                "_increments",
+                "tail_size_int",
             ]
 
         if isinstance(train_hyperparams, list):
             train_hyperparams = {
-                attr: h5.attrs[attr] for attr in train_hyperparams
-                if attr in h5.attrs
+                attr: h5.attrs[attr] for attr in train_hyperparams if attr in h5.attrs
             }
         elif not isinstance(train_hyperparams, dict):
-            raise TypeError(' '.join([
-                '`train_hyperparams` expected type: None, list, or dict, but',
-                f'recieved {type(train_hyperparams)}',
-            ]))
+            raise TypeError(
+                " ".join(
+                    [
+                        "`train_hyperparams` expected type: None, list, or dict, but",
+                        f"recieved {type(train_hyperparams)}",
+                    ]
+                )
+            )
 
-        _increments = train_hyperparams.pop('_increments')
+        _increments = train_hyperparams.pop("_increments")
         evm = ExtremeValueMachine(labels=labels, **train_hyperparams)
         evm.one_vs_rests = one_vs_rests
         evm._increments = _increments
