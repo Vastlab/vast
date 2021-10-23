@@ -2,6 +2,7 @@ import sys
 import torch
 import numpy as np
 import time
+from typing import Tuple
 from ..tools import pairwisedistances
 
 
@@ -99,7 +100,9 @@ def pykeops_KMeans(x, K=10, Niter=300, verbose=True, random_indx="first_k"):
 
     for i in range(Niter):
         c_j = LazyTensor(c[None, :, :])  # (1, Nclusters, D)
-        D_ij = ((x_i - c_j) ** 2).sum(-1)  # (Npoints, Nclusters) symbolic matrix of squared distances
+        D_ij = ((x_i - c_j) ** 2).sum(
+            -1
+        )  # (Npoints, Nclusters) symbolic matrix of squared distances
         cl = D_ij.argmin(dim=1).long().view(-1)  # Points -> Nearest cluster
 
         Ncl = torch.bincount(cl).type(x.dtype)  # Class weights
@@ -152,22 +155,35 @@ def dbscan(x, distance_metric, eps=0.3, min_samples=10, *args_passed, **kargs):
     indx = torch.tensor(db.core_sample_indices_).cuda()
     if indx.shape[0] == 0:
         indx = torch.tensor([0]).cuda()
-    # from IPython import embed;embed();
     indx = indx[:, None].repeat(1, x.shape[1])
     centroids = x.gather(0, indx).cpu().clone()
     return centroids, torch.tensor(db.labels_)  # ,db.core_sample_indices_
 
 
-def finch(x, ind_of_interest=-1, *args_passed, **kargs):
+def finch(
+    x: torch.Tensor, cluster_of_interest: int = -1, *args_passed, **kargs
+) -> Tuple[torch.Tensor, torch.LongTensor]:
+    """
+    This function is simply a wrapper around the original FINCH code.
+    It performs clustering on a provided torch tensor x.
+    FINCH by default returns three levels of clustering, you can choose which level you want with the cluster_of_interest parameter.
+    By default it returns the level with maximum clusters i.e. -1
+    :param x: Torch Tensor
+    :param cluster_of_interest:  int
+    :param args_passed: Ignored
+    :param kargs: Ignored
+    :return: Tuple(Centroids, Cluster assigned to each sample in x)
+    """
     from .FINCH.python.finch import FINCH
 
+    original_device = x.device
     c, num_clust, req_c = FINCH(x.cpu().numpy(), verbose=False)
-    num_clust_obtained = num_clust[ind_of_interest]
+    num_clust_obtained = num_clust[cluster_of_interest]
     assignments_of_interest = (
-        torch.tensor(c[:, ind_of_interest]).type(torch.LongTensor).cuda()
+        torch.tensor(c[:, cluster_of_interest]).type(torch.LongTensor).to(original_device)
     )
     centroids = []
-    x = x.cuda()
+    x = x.to(original_device)
     for i in range(num_clust_obtained):
         centroids.append(torch.mean(x[assignments_of_interest == i], dim=0))
     centroids = torch.stack(centroids)
