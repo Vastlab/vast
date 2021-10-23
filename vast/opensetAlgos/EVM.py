@@ -1,7 +1,11 @@
+"""
+This gpu based reimplementation of EVM was written by Akshay Raj Dhamija.
+"""
 import torch
 import itertools
 from ..tools import pairwisedistances
 from ..DistributionModels import weibull
+from typing import Iterator, Tuple, List, Dict
 
 
 def EVM_Params(parser):
@@ -111,9 +115,58 @@ def set_cover(mr_model, positive_distances, cover_threshold):
     return (extreme_vectors_models, extreme_vectors_indexes, covered_vectors)
 
 
-def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models=None):
-    # TODO: Convert args.chunk_size from number of classes per batch to number of samples per batch.
-    # This would be useful for handeling highly unbalanced number of samples per class.
+def EVM_Training(
+    pos_classes_to_process: List[str],
+    features_all_classes: Dict[str, torch.Tensor],
+    args,
+    gpu: int,
+    models=None,
+) -> Iterator[Tuple[str, Tuple[str, dict]]]:
+    """
+    :param pos_classes_to_process: List of class names to be processed by this function in the current process class.
+    :param features_all_classes: features of all classes, note the classes in pos_classes_to_process can be a subset of the keys for this dictionary
+    :param args: This can be a named tuple or an argument parser object containing the arguments mentioned in the EVM_Params function above.
+    :param gpu: This is an integer corresponding to the gpu number to use by the current process.
+    :param models: Not used during training, input ignored.
+    :return: Tuple(parameter combination identifier, Tuple(class name, its evm model))
+    TODO: Currently the training needs gpus, there is no cpu version for now since it is low priority.
+
+    For using with multiprocessing:
+    This function has been designed such that computational work load can be easily split into different processes while
+    reducing redundant work done for grid search. Each process is only responsible for creating models for classes mentioned
+    in the pos_classes_to_process list. For these classes they would create models for each of the possible hyper parameter
+    combinations. Please note pos_classes_to_process only contains the names of classes or the keys in features_all_classes
+    that need to be processed. The actual features are held in features_all_classes and can be in shared memory across
+    different processes. Though the pos_classes_to_process variable changes per process features_all_classes does not.
+    For a detailed example that exploits these features please visit https://github.com/akshay-raj-dhamija/vel.
+
+
+    Grid Search Capabilities:
+    This function is also capable of performing grid search for hyper parameters such as tailsize, distance multiplier
+    and cover threshold. Which are expected to be passed as list in the args variable, whose elements are supposed to be
+    the ones mentioned in the EVM_Params function. The most compute expensive part of EVM is the pairwise distance
+    calculation, which is not impacted by the hyper parameters for which grid search is performed.
+    Our approach drastically reduces the computation time by re-utilizing the pairwise distance computation across hyper
+    parameter combinations.
+    TODO: The computation time can be further reduced by reusing weibull fitting for different cover threshold parameters.
+
+
+    Memory issues:
+    It must be noted that the maximum possible tail size being considered for grid search can impact the memory consumption.
+    A variable to help reduce the memory consumption is the chunk_size parameter, the lesser the chunk_size, the lesser
+    memory is requiered. While this parameter can be very helpful when running the EVM in multiple processes, it might
+    not help if the number of classes being handled by the current process is equivalent to the total number of classes.
+    TODO: Convert args.chunk_size from number of classes per batch to number of samples per batch. This would be useful
+    for handeling highly unbalanced number of samples per class.
+
+
+    Models provided by this function:
+    This function provides models in a partitioned way using an Iterator.
+    It would only provide models for the classes mentioned in the pos_classes_to_process.
+    At each iterator step it would provide the model for a specific class and a specific hyper parameter combination.
+    The results are provided as a Tuple(str, Tuple2), where the str entry tells the hyper parameter combination.
+    The Tuple2 contains the name of the class and its corresponding EVM model.
+    """
     negative_classes_for_current_batch = []
     no_of_negative_classes_for_current_batch = 0
     temp = []
@@ -211,17 +264,38 @@ def EVM_Training(pos_classes_to_process, features_all_classes, args, gpu, models
                 (
                     pos_cls_name,
                     dict(
+                        # torch.Tensor -- The extreme vectors used by EVM
                         extreme_vectors=extreme_vectors,
+                        # torch.LongTensor -- The index of the above extreme_vectors corresponding to their location in
+                        # features_all_classes, only useful if you want to reduce the size of EVM model you save.
                         extreme_vectors_indexes=extreme_vectors_indexes,
+                        # weibull.weibull class obj -- the output of weibulls.return_all_parameters() combined with the
+                        # extreme_vectors is the actual EVM model for one given class.
                         weibulls=extreme_vectors_models,
                     ),
                 ),
             )
 
 
-def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, models=None):
-    for pos_cls_name in pos_classes_to_process:
-        test_cls_feature = features_all_classes[pos_cls_name].to(f"cuda:{gpu}")
+def EVM_Inference(
+    pos_classes_to_process: List[str],
+    features_all_classes: Dict[str, torch.Tensor],
+    args,
+    gpu: int,
+    models: Dict = None,
+) -> Iterator[Tuple[str, Tuple[str, torch.Tensor]]]:
+    """
+    :param pos_classes_to_process: List of batches to be processed by this function in the current process class.
+    :param features_all_classes: features of all classes, note the classes in pos_classes_to_process can be a subset of
+                                the keys for this dictionary
+    :param args: Can be a named tuple or an argument parser object containing the arguments mentioned in the EVM_Params
+                function above. Only the distance_metric argument is actually used during inferencing.
+    :param gpu: An integer corresponding to the gpu number to use by the current process.
+    :param models: The collated model created for a single hyper parameter combination.
+    :return: Iterator(Tuple(str, Tuple(batch_identifier, torch.Tensor)))
+    """
+    for batch_to_process in pos_classes_to_process:
+        test_cls_feature = features_all_classes[batch_to_process].to(f"cuda:{gpu}")
         assert test_cls_feature.shape[0] != 0
         probs = []
         for cls_no, cls_name in enumerate(sorted(models.keys())):
@@ -231,10 +305,15 @@ def EVM_Inference(pos_classes_to_process, features_all_classes, args, gpu, model
             probs_current_class = models[cls_name]["weibulls"].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
         probs = torch.stack(probs, dim=-1).cpu()
-        yield ("probs", (pos_cls_name, probs))
+        yield ("probs", (batch_to_process, probs))
 
 
 class EVM_Inference_cpu_max_knowness_prob:
+    """
+    This class performs the same function as EVM_Inference but rather than providing per class knowness score, it
+    provides maximum knowness score for each sample. It is faster and currently only runs on cpu.
+    """
+
     def __init__(self, distance_metric, models):
         combined_weibull_model = {}
         combined_weibull_model["Scale"] = []
