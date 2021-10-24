@@ -1,3 +1,7 @@
+"""
+Authors: Akshay Raj Dhamija and Touqeer Ahmad.
+This is gpu based reimplementation of libmr.
+"""
 import numpy as np
 import torch
 
