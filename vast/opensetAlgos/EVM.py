@@ -1,5 +1,16 @@
 """
-This gpu based reimplementation of EVM was written by Akshay Raj Dhamija.
+Author: Akshay Raj Dhamija
+
+@article{rudd2017extreme,
+  title={The extreme value machine},
+  author={Rudd, Ethan M and Jain, Lalit P and Scheirer, Walter J and Boult, Terrance E},
+  journal={IEEE transactions on pattern analysis and machine intelligence},
+  volume={40},
+  number={3},
+  pages={762--768},
+  year={2017},
+  publisher={IEEE}
+}
 """
 import torch
 import itertools
@@ -125,10 +136,10 @@ def EVM_Training(
     """
     :param pos_classes_to_process: List of class names to be processed by this function in the current process class.
     :param features_all_classes: features of all classes, note the classes in pos_classes_to_process can be a subset of the keys for this dictionary
-    :param args: This can be a named tuple or an argument parser object containing the arguments mentioned in the EVM_Params function above.
-    :param gpu: This is an integer corresponding to the gpu number to use by the current process.
+    :param args: A named tuple or an argument parser object containing the arguments mentioned in the EVM_Params function above.
+    :param gpu: An integer corresponding to the gpu number to use by the current process.
     :param models: Not used during training, input ignored.
-    :return: Tuple(parameter combination identifier, Tuple(class name, its evm model))
+    :return: Iterator(Tuple(parameter combination identifier, Tuple(class name, its evm model)))
     TODO: Currently the training needs gpus, there is no cpu version for now since it is low priority.
 
     For using with multiprocessing:
@@ -285,7 +296,7 @@ def EVM_Inference(
     models: Dict = None,
 ) -> Iterator[Tuple[str, Tuple[str, torch.Tensor]]]:
     """
-    :param pos_classes_to_process: List of batches to be processed by this function in the current process class.
+    :param pos_classes_to_process: List of batches to be processed by this function in the current process.
     :param features_all_classes: features of all classes, note the classes in pos_classes_to_process can be a subset of
                                 the keys for this dictionary
     :param args: Can be a named tuple or an argument parser object containing the arguments mentioned in the EVM_Params
