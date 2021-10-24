@@ -1,7 +1,22 @@
+"""
+Author: Akshay Raj Dhamija
+
+@inproceedings{bendale2016towards,
+  title={Towards open set deep networks},
+  author={Bendale, Abhijit and Boult, Terrance E},
+  booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+  pages={1563--1572},
+  year={2016}
+}
+
+While the reimplementation in this file only performs the EVT-recognition part of the original paper, for the actual
+openmax algorithm use the functionality from this file in conjunction with openmax_alpha function in heuristic.py
+"""
 import torch
 import itertools
 from ..tools import pairwisedistances
 from ..DistributionModels import weibull
+from typing import Iterator, Tuple, List, Dict
 
 
 def OpenMax_Params(parser):
@@ -44,7 +59,21 @@ def fit_high(distances, distance_multiplier, tailsize):
     return mr
 
 
-def OpenMax_Training(pos_classes_to_process, features_all_classes, args, gpu, models=None):
+def OpenMax_Training(
+    pos_classes_to_process: List[str],
+    features_all_classes: Dict[str, torch.Tensor],
+    args,
+    gpu: int,
+    models=None,
+) -> Iterator[Tuple[str, Tuple[str, dict]]]:
+    """
+    :param pos_classes_to_process: List of class names to be processed by this function in the current process.
+    :param features_all_classes: features of all classes, note the classes in pos_classes_to_process can be a subset of the keys for this dictionary
+    :param args: A named tuple or an argument parser object containing the arguments mentioned in the EVM_Params function.
+    :param gpu: An integer corresponding to the gpu number to use by the current process.
+    :param models: Not used during training, input ignored.
+    :return: Iterator(Tuple(parameter combination identifier, Tuple(class name, its evm model)))
+    """
     for pos_cls_name in pos_classes_to_process:
         features = features_all_classes[pos_cls_name].clone().to(f"cuda:{gpu}")
         MAV = torch.mean(features, dim=0).to(f"cuda:{gpu}")
@@ -61,13 +90,29 @@ def OpenMax_Training(pos_classes_to_process, features_all_classes, args, gpu, mo
             )
 
 
-def OpenMax_Inference(pos_classes_to_process, features_all_classes, args, gpu, models):
-    for pos_cls_name in pos_classes_to_process:
-        features = features_all_classes[pos_cls_name].to(f"cuda:{gpu}")
+def OpenMax_Inference(
+    pos_classes_to_process: List[str],
+    features_all_classes: Dict[str, torch.Tensor],
+    args,
+    gpu: int,
+    models: Dict = None,
+) -> Iterator[Tuple[str, Tuple[str, torch.Tensor]]]:
+    """
+    :param pos_classes_to_process: List of batches to be processed by this function in the current process.
+    :param features_all_classes: features of all classes, note the classes in pos_classes_to_process can be a subset of
+                                the keys for this dictionary
+    :param args: Can be a named tuple or an argument parser object containing the arguments mentioned in the EVM_Params
+                function above. Only the distance_metric argument is actually used during inferencing.
+    :param gpu: An integer corresponding to the gpu number to use by the current process.
+    :param models: The collated model created for a single hyper parameter combination.
+    :return: Iterator(Tuple(str, Tuple(batch_identifier, torch.Tensor)))
+    """
+    for batch_to_process in pos_classes_to_process:
+        features = features_all_classes[batch_to_process].to(f"cuda:{gpu}")
         probs = []
         for class_name in sorted(models.keys()):
             MAV = models[class_name]["MAV"].to(f"cuda:{gpu}")
             distances = pairwisedistances.__dict__[args.distance_metric](features, MAV)
             probs.append(1 - models[class_name]["weibulls"].wscore(distances.cpu()))
         probs = torch.cat(probs, dim=1)
-        yield ("probs", (pos_cls_name, probs))
+        yield ("probs", (batch_to_process, probs))
