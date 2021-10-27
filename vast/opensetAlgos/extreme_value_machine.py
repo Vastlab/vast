@@ -65,7 +65,7 @@ class EVM1vsRest(object):
         )
 
     def save(self, h5, overwrite=False):
-        """Save the model within the given H5DF file."""
+        """Save the model within the given HDF5 file."""
         # Open file for writing; create if not existent and avoid overwriting.
         if isinstance(h5, str):
             h5 = h5py.File(create_filepath(h5, overwrite), "w")
@@ -98,8 +98,8 @@ class EVM1vsRest(object):
 
     @staticmethod
     def load(h5):
-        """Load the model from the given H5DF file."""
-        # Open the H5DF for reading
+        """Load the model from the given HDF5 file."""
+        # Open the HDF5 for reading
         if isinstance(h5, str):
             h5 = h5py.File(h5, "r")
 
@@ -460,7 +460,7 @@ class ExtremeValueMachine(SupervisedClassifier):
         return probs / probs.sum(1, True)
 
     def save(self, h5, overwrite=False):
-        """Saves the EVM model as H5DF to disk with the labels and parameters."""
+        """Saves the EVM model as HDF5 to disk with the labels and parameters."""
         if self.one_vs_rests is None:
             raise RuntimeError("The ExtremeValueMachine has not been trained yet.")
 
