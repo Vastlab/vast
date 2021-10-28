@@ -25,6 +25,7 @@ Vision And Security Technology (VAST) Lab.
 1. OpenMax
 2. Multimodal OpenMax
 3. Extreme Value Machine (EVM)
+4. Weibull Prototype Learning (WPL)
 
 ### Reimplementation of libMR
 This repo contains a torch based reimplementation of the [libMR repo](https://github.com/Vastlab/libMR)
