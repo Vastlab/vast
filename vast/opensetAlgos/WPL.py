@@ -1,36 +1,72 @@
+
 """
 Author: Akshay Raj Dhamija
 
 Weibull Prototype Learning (WPL)
 
-There is no paper
 """
+
 import torch
 import itertools
-from collections import OrderedDict
 from ..tools import pairwisedistances
 from ..DistributionModels import weibull
-from typing import Iterator, Tuple, List, Dict
-from typing import OrderedDict as OrderedDict_typing
+from typing import Iterator, Tuple, List, Dict, OrderedDict
 
 
 def WPL_Params(parser):
-  raise NotImplementedError("Akshay Raj Dhamija will complete this function later")
+    WPL_params = parser.add_argument_group("WPL params")
+    WPL_params.add_argument(
+        "--tailsize",
+        nargs="+",
+        type=float,
+        default=[1.0],
+        help="tail size to use default: %(default)s",
+    )
+    WPL_params.add_argument(
+        "--distance_multiplier",
+        nargs="+",
+        type=float,
+        default=[1.0],
+        help="distance multiplier to use default: %(default)s",
+    )
+    WPL_params.add_argument(
+        "--default_scale",
+        nargs="+",
+        type=float,
+        default=[1.0],
+        help="Weibull scale to use when the number of uniqe element is less than 5 default: %(default)s",
+    )
+    WPL_params.add_argument(
+        "--default_shape",
+        nargs="+",
+        type=float,
+        default=[0.1],
+        help="Weibull shape to use when the number of uniqe element is less than 5 default:  %(default)s",
+    )
+    return parser, dict(
+        group_parser=WPL_params,
+        param_names=("tailsize", "distance_multiplier", "default_scale", "default_shape"),
+        param_id_string="TS_{}_DM_{:.4f}_SC_{:.4f}_SH_{:.4f}",
+    )
 
 
-def fit_high(distances, distance_multiplier, tailsize):
+def fit_high(distances, distance_multiplier, tailsize, default_shape, default_scale):
+    distances = torch.unique(distances)
     if tailsize <= 1:
         tailsize = min(tailsize * distances.shape[1], distances.shape[1])
     tailsize = int(min(tailsize, distances.shape[1]))
     mr = weibull.weibull()
-    mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
+    if distances.shape[1] < 5:
+        pass
+    else:
+        mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
     mr.tocpu()
     return mr
 
   
 def WPL_Training(
     pos_classes_to_process: List[str],
-    features_all_classes: OrderedDict_typing[str, torch.Tensor],
+    features_all_classes: OrderedDict[str, torch.Tensor],
     args,
     gpu: int,
     models=None,
@@ -49,27 +85,56 @@ def WPL_Training(
             assert args.dimension == features.shape[1]
 
             center = torch.mean(features, dim=0).to(f"cuda:{gpu}")
-            distances = 
-            for tailsize, distance_multiplier in itertools.product(
-                args.tailsize, args.distance_multiplier
+            distances = torch.abs(features - center.view(1,args.dimension).repeat(features.shape[0], 1))
+            for tailsize, distance_multiplier, default_shape, default_scale  in itertools.product(
+                args.tailsize, args.distance_multiplier, args.default_shape, args.default_scale
             ):
-                weibull_list = list()
-                for _ in args.dimension:
-                  weibull_model = fit_high(distances.T, distance_multiplier, tailsize)
-                  weibull_list.append(weibull_model)
-
-                  yield (
-                    f"TS_{org_tailsize}_DM_{distance_multiplier:.2f}_CT_{cover_threshold:.2f}",
-                    (pos_cls_name, 
-                     OrderedDict([('center', center), ('weibull_list', weibull_list))]),
-                  )
-                  
+                  weibull_list = list()
+                  for k in args.dimension:
+                      weibull_model = fit_high(distances[:,k].T, distance_multiplier, tailsize, default_shape, default_scale)
+                      weibull_list.append(weibull_model)
+    
+                      yield (
+                        f"TS_{tailsize}_DM_{distance_multiplier:.4f}_SC{default_scale:.4f}_SH_{default_shape:.4f}",
+                        (pos_cls_name,  {'center':center, 'weibull_list': weibull_list})
+                      )
+                      
               
               
               
+def WPL_Inference(
+    pos_classes_to_process: List[str],
+    features_all_classes: Dict[str, torch.Tensor],
+    args,
+    gpu: int,
+    models: Dict = None,
+) -> Iterator[Tuple[str, Tuple[str, torch.Tensor]]]:
+    """
+    :param pos_classes_to_process: List of batches to be processed by this function in the current process.
+    :param features_all_classes: features of all classes, note the classes in pos_classes_to_process can be a subset of
+                                the keys for this dictionary
+    :param args: Can be a named tuple or an argument parser object containing the arguments mentioned in the WPL_Params
+                function above. Only the distance_metric argument is actually used during inferencing.
+    :param gpu: An integer corresponding to the gpu number to use by the current process.
+    :param models: The collated model created for a single hyper parameter combination.
+    :return: Iterator(Tuple(str, Tuple(batch_identifier, torch.Tensor)))
+    """         
+    for batch_to_process in pos_classes_to_process:
+        test_cls_feature = features_all_classes[batch_to_process].to(f"cuda:{gpu}")
+        assert test_cls_feature.shape[0] != 0
+        probs = []
+        for cls_no, cls_name in enumerate(models.keys())     
+            center = model[cls_name]["center"].to(f"cuda:{gpu}")
+            distances = torch.abs(test_cls_feature - center.view(1,args.dimension).repeat(test_cls_feature.shape[0], 1))
+            weibull_list = models[class_name]["weibull_list"]
+            p = torch.empty(args.dimension)
+            for k in args.dimension:
+                weibull = weibull_list[k]
+                p[k] =  1 - weibull.wscore(distances[:,k].cpu()) )
+            probs.append(  torch.min(p)  )
               
-              
-              
+        probs = torch.cat(probs, dim=1)
+        yield ("probs", (batch_to_process, probs))
               
             
 
