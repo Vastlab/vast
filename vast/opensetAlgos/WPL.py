@@ -80,6 +80,12 @@ def fit_high(distances, distance_multiplier, tailsize, default_shape, default_sc
     mr = weibull.weibull()
     if distances.shape[1] < 5:
         pass
+        mr.sign = 1
+        mr.wbFits = torch.zeros(1, 2)
+        mr.wbFits[0, 1] = default_scale
+        mr.wbFits[0, 0] = default_shape
+        mr._ = torch.Tensor(0.0) # translate Amount
+        mr.smallScoreTensor =  torch.Tensor(0.0)#  small Score
     else:
         mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
     mr.tocpu()
@@ -117,7 +123,7 @@ def WPL_Training(
                       weibull_list.append(weibull_model)
     
                       yield (
-                        f"TS_{tailsize}_DM_{distance_multiplier:.4f}_SC{default_scale:.4f}_SH_{default_shape:.4f}",
+                        f"TS_{tailsize}_DM_{distance_multiplier:.4f}_SC_{default_scale:.4f}_SH_{default_shape:.4f}",
                         (pos_cls_name,  {'center':center, 'weibull_list': weibull_list})
                       )
                       
