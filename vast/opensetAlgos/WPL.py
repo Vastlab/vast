@@ -1,8 +1,30 @@
 
 """
-Author: Akshay Raj Dhamija
+Motivated from: https://github.com/Vastlab/vast/blob/main/vast/opensetAlgos/openmax.py
 
 Weibull Prototype Learning (WPL)
+
+
+WPL fits a Weibull distribution for each dimension of the feature of each class. 
+If we have 'n' classes and the dimension of the feature is 'd', then it fit 'n x d' Weibull. 
+It computes and saves the center (mean) of each class, which is equivalent to Prototype in the literature. 
+So, each Prototype has 'd' dimensions. Therefore, we fit 'd' Weibulls for each center (Prototype).
+Distance of a point (an input) is defined as the absolute value of the difference between 
+the point (input) and the center (Prototype). So, distance is a vector with 'd' dimension. 
+Distance is not a scalar. The probability of each class is the minimum Weibull probability of all dimensions.
+
+In the training time, if a Weibll (class, dimension) has 5 or more unique values, maximum likelihood 
+estimator (MLE)  or maximum a posterior (MAP) can be used to estimate the Weibull parameter. 
+If a Weibll (class, dimension) has less than 5 unique values, instead of estimating, it uses 
+the default parameter for creating Weibull. The default parameters are the default scale and default shape.
+
+
+WPL has 5 arguments: dimension, tail size, distance multiplier, default_scale, default shape
+
+The main difference between WPL and OpenMax is how they compute the distance. 
+Therefore, the number of Weibull is different between WPL and OpenMax. Another difference 
+is how they are training Weibull when the number of unique values is less than 5.
+
 
 """
 
