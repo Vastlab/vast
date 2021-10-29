@@ -107,25 +107,24 @@ def WPL_Training(
     :param models: Not used during training, input ignored.
     :return: Iterator(Tuple(parameter combination identifier, Tuple(class name, its evm model)))
     """
-    with torch.no_grad():
-        for pos_cls_name in pos_classes_to_process:
-            features = features_all_classes[pos_cls_name].clone().to(f"cuda:{gpu}")
-            assert args.dimension == features.shape[1]
+    for pos_cls_name in pos_classes_to_process:
+        features = features_all_classes[pos_cls_name].clone().to(f"cuda:{gpu}")
+        assert args.dimension == features.shape[1]
 
-            center = torch.mean(features, dim=0).to(f"cuda:{gpu}")
-            distances = torch.abs(features - center.view(1,args.dimension).repeat(features.shape[0], 1))
-            for tailsize, distance_multiplier, default_shape, default_scale  in itertools.product(
-                args.tailsize, args.distance_multiplier, args.default_shape, args.default_scale
-            ):
-                  weibull_list = list()
-                  for k in args.dimension:
-                      weibull_model = fit_high(distances[:,k].T, distance_multiplier, tailsize, default_shape, default_scale)
-                      weibull_list.append(weibull_model)
-    
-                      yield (
-                        f"TS_{tailsize}_DM_{distance_multiplier:.4f}_SC_{default_scale:.4f}_SH_{default_shape:.4f}",
-                        (pos_cls_name,  {'center':center, 'weibull_list': weibull_list})
-                      )
+        center = torch.mean(features, dim=0).to(f"cuda:{gpu}")
+        distances = torch.abs(features - center.view(1,args.dimension).repeat(features.shape[0], 1))
+        for tailsize, distance_multiplier, default_shape, default_scale  in itertools.product(
+            args.tailsize, args.distance_multiplier, args.default_shape, args.default_scale
+        ):
+              weibull_list = list()
+              for k in args.dimension:
+                  weibull_model = fit_high(distances[:,k].T, distance_multiplier, tailsize, default_shape, default_scale)
+                  weibull_list.append(weibull_model)
+
+                  yield (
+                    f"TS_{tailsize}_DM_{distance_multiplier:.4f}_SC_{default_scale:.4f}_SH_{default_shape:.4f}",
+                    (pos_cls_name,  {'center':center, 'weibull_list': weibull_list})
+                  )
                       
               
               
