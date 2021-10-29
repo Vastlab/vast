@@ -19,7 +19,7 @@ If a Weibll (class, dimension) has less than 5 unique values, instead of estimat
 the default parameter for creating Weibull. The default parameters are the default scale and default shape.
 
 
-WPL has 5 arguments: dimension, tail size, distance multiplier, default_scale, default shape
+WPL has 4 arguments: tail size, distance multiplier, default_scale, default shape
 
 The main difference between WPL and OpenMax is how they compute the distance. 
 Therefore, the number of Weibull is different between WPL and OpenMax. Another difference 
@@ -107,17 +107,21 @@ def WPL_Training(
     :param models: Not used during training, input ignored.
     :return: Iterator(Tuple(parameter combination identifier, Tuple(class name, its evm model)))
     """
+    dimension = None
     for pos_cls_name in pos_classes_to_process:
         features = features_all_classes[pos_cls_name].clone().to(f"cuda:{gpu}")
-        assert args.dimension == features.shape[1]
+        if dimension == None:
+            dimension = features.shape[1]
+         else:
+            assert dimension == features.shape[1]
 
-        center = torch.mean(features, dim=0).to(f"cuda:{gpu}")
-        distances = torch.abs(features - center.view(1,args.dimension).repeat(features.shape[0], 1))
+        center = torch.mean(features, dim=0).view(1,dimension).to(f"cuda:{gpu}")
+        distances = torch.abs(features - center.repeat(features.shape[0], 1))
         for tailsize, distance_multiplier, default_shape, default_scale  in itertools.product(
             args.tailsize, args.distance_multiplier, args.default_shape, args.default_scale
         ):
               weibull_list = list()
-              for k in args.dimension:
+              for k in range(dimension):
                   weibull_model = fit_high(distances[:,k].T, distance_multiplier, tailsize, default_shape, default_scale)
                   weibull_list.append(weibull_model)
 
@@ -152,10 +156,11 @@ def WPL_Inference(
         probs = []
         for cls_no, cls_name in enumerate(models.keys())     
             center = model[cls_name]["center"].to(f"cuda:{gpu}")
-            distances = torch.abs(test_cls_feature - center.view(1,args.dimension).repeat(test_cls_feature.shape[0], 1))
+            dimension = center.shape[1]
+            distances = torch.abs(test_cls_feature - center.repeat(test_cls_feature.shape[0], 1))
             weibull_list = models[class_name]["weibull_list"]
-            p = torch.empty(args.dimension)
-            for k in args.dimension:
+            p = torch.empty(dimension)
+            for k in range(dimension):
                 weibull = weibull_list[k]
                 p[k] =  1 - weibull.wscore(distances[:,k].cpu()) )
             probs.append(  torch.min(p)  )
