@@ -57,7 +57,9 @@ def read_features(args, feature_file_names=None, cls_to_process=None):
                 image_names = hf[cls]["image_names"][()].tolist()
             else:
                 image_names = None
-            features = torch.cat(temp, dim=1)
+            if len(temp[0].shape) == 1:
+                temp[0] = temp[0][None,:]
+            features = torch.cat(temp,dim=0)
             yield cls, features, image_names
     finally:
         for h in h5_objs:
