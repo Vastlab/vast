@@ -46,7 +46,7 @@ def EVM_Params(parser):
         "--distance_metric",
         default="euclidean",
         type=str,
-        choices=["cosine", "euclidean"],
+        choices=list(__pairwisedistances__.keys()),
         help="distance metric to use\ndefault: %(default)s",
     )
     EVM_params_parser.add_argument(
@@ -58,7 +58,7 @@ def EVM_Params(parser):
     )
     EVM_params_parser.add_argument(
         "--distances_unique",
-        type=bool,
+        action="store_true",
         default=False,
         help="Use unique distances during fitting",
     )
@@ -75,7 +75,7 @@ def fit_low(distances, distance_multiplier, tailsize, gpu):
                 dict(
                     Scale=-1,
                     Shape=-1,
-                    signTensor= 1,
+                    signTensor= -1,
                     smallScoreTensor=torch.Tensor(0.0),
                 )
             )
