@@ -101,7 +101,7 @@ def OpenMax_Training(
         ):
             # check if unique distances are desired
             if args.distances_unique:
-                distances = torch.unique(distances)
+                distances = torch.unique(distances)[:, None]
 
             weibull_model = fit_high(distances.T, distance_multiplier, tailsize)
             yield (
