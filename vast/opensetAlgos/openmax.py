@@ -39,12 +39,12 @@ def OpenMax_Params(parser):
         "--distance_metric",
         default="cosine",
         type=str,
-        choices=["cosine", "euclidean"],
+        choices=list(__pairwisedistances__.keys()),
         help="distance metric to use default: %(default)s",
     )
     OpenMax_params.add_argument(
         "--distances_unique",
-        type=bool,
+        action="store_true",
         default=False,
         help="Use unique distances during fitting",
     )
