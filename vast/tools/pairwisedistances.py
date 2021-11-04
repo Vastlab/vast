@@ -25,4 +25,4 @@ def l1(x, y):
     return distances
 
 
-__dict__ = {"cosine": cosine, "euclidean": euclidean, "l1", l1}
+__dict__ = {"cosine": cosine, "euclidean": euclidean, "l1": l1}
