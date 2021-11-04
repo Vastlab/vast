@@ -49,6 +49,12 @@ def MultiModalOpenMax_Params(parser):
         choices=["KMeans", "dbscan", "finch"],
         help="Clustering algorithm used for multi modal openmax default: %(default)s",
     )
+    MultiModalOpenMax_params.add_argument(
+        "--distances_unique",
+        type=bool,
+        default=False,
+        help="Use unique distances during fitting",
+    )
     return parser, dict(
         group_parser=MultiModalOpenMax_params,
         param_names=("Clustering_Algo", "tailsize", "distance_multiplier"),
@@ -101,6 +107,11 @@ def MultiModalOpenMax_Training(
                 distances = pairwisedistances.__dict__[args.distance_metric](
                     f, MAV[None, :]
                 )
+                
+                # check if unique distances are desired
+                if args.distances_unique:
+                    distances = torch.unique(distances)
+
                 if distances.shape[0] <= 5:
                     continue
                 weibull_model = fit_high(distances.T, distance_multiplier, tailsize)

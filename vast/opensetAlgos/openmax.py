@@ -42,6 +42,12 @@ def OpenMax_Params(parser):
         choices=["cosine", "euclidean"],
         help="distance metric to use default: %(default)s",
     )
+    OpenMax_params.add_argument(
+        "--distances_unique",
+        type=bool,
+        default=False,
+        help="Use unique distances during fitting",
+    )
     return parser, dict(
         group_parser=OpenMax_params,
         param_names=("tailsize", "distance_multiplier"),
@@ -53,8 +59,18 @@ def fit_high(distances, distance_multiplier, tailsize):
     if tailsize <= 1:
         tailsize = min(tailsize * distances.shape[1], distances.shape[1])
     tailsize = int(min(tailsize, distances.shape[1]))
-    mr = weibull.weibull()
-    mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
+    if distances.shape[1] < 5:
+        mr = weibull.weibull(
+                dict(
+                    Scale=-1,
+                    Shape=-1,
+                    signTensor= 1,
+                    smallScoreTensor=torch.Tensor(0.0),
+                )
+            )
+    else:
+        mr = weibull.weibull()
+        mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
     mr.tocpu()
     return mr
 
@@ -83,6 +99,10 @@ def OpenMax_Training(
         for tailsize, distance_multiplier in itertools.product(
             args.tailsize, args.distance_multiplier
         ):
+            # check if unique distances are desired
+            if args.distances_unique:
+                distances = torch.unique(distances)
+
             weibull_model = fit_high(distances.T, distance_multiplier, tailsize)
             yield (
                 f"TS_{tailsize}_DM_{distance_multiplier:.2f}",

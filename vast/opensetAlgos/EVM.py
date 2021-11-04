@@ -56,6 +56,12 @@ def EVM_Params(parser):
         help="Number of classes per chunk, reduce this parameter if facing OOM "
         "error\ndefault: %(default)s",
     )
+    EVM_params_parser.add_argument(
+        "--distances_unique",
+        type=bool,
+        default=False,
+        help="Use unique distances during fitting",
+    )
     return parser, dict(
         group_parser=EVM_params_parser,
         param_names=("tailsize", "distance_multiplier", "cover_threshold"),
@@ -64,13 +70,23 @@ def EVM_Params(parser):
 
 
 def fit_low(distances, distance_multiplier, tailsize, gpu):
-    mr = weibull.weibull()
-    mr.FitLow(
-        distances.double() * distance_multiplier,
-        min(tailsize, distances.shape[1]),
-        isSorted=False,
-        gpu=gpu,
-    )
+    if distances.shape[1] < 5:
+        mr = weibull.weibull(
+                dict(
+                    Scale=-1,
+                    Shape=-1,
+                    signTensor= 1,
+                    smallScoreTensor=torch.Tensor(0.0),
+                )
+            )
+    else:
+        mr = weibull.weibull()
+        mr.FitLow(
+            distances.double() * distance_multiplier,
+            min(tailsize, distances.shape[1]),
+            isSorted=False,
+            gpu=gpu,
+        )
     return mr
 
 
@@ -236,6 +252,10 @@ def EVM_Training(
             ]
             del distances
         bottom_k_distances = bottom_k_distances[0].to(f"cuda:{gpu}")
+        
+        # check if unique distances are desired
+        if args.distances_unique:
+            bottom_k_distances = torch.unique(bottom_k_distances)
 
         # Find distances to other samples of same class
         positive_distances = pairwisedistances.__dict__[args.distance_metric](
