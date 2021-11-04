@@ -20,5 +20,9 @@ def euclidean(x, y):
     distances = torch.cdist(x, y, p=2.0, compute_mode="donot_use_mm_for_euclid_dist")
     return distances
 
+def l1(x, y):
+    distances = torch.cdist(x, y, p=1.0, compute_mode="donot_use_mm_for_euclid_dist")
+    return distances
 
-__dict__ = {"cosine": cosine, "euclidean": euclidean}
+
+__dict__ = {"cosine": cosine, "euclidean": euclidean, "l1", l1}
