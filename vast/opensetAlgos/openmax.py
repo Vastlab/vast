@@ -62,10 +62,11 @@ def fit_high(distances, distance_multiplier, tailsize):
     if distances.shape[1] < 5:
         mr = weibull.weibull(
                 dict(
-                    Scale=-1,
-                    Shape=-1,
+                    Scale=torch.Tensor([-1]),
+                    Shape=torch.Tensor([-1]),
+                    translateAmountTensor=torch.Tensor([0.0]),               
                     signTensor= 1,
-                    smallScoreTensor=torch.Tensor(0.0),
+                    smallScoreTensor=torch.Tensor([0.0]),
                 )
             )
     else:
