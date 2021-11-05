@@ -257,7 +257,7 @@ def EVM_Training(
 
         # check if unique distances are desired
         if args.distances_unique:
-            bottom_k_distances = torch.unique(bottom_k_distances)
+            bottom_k_distances = torch.unique(bottom_k_distances)[:, None]
 
         # Find distances to other samples of same class
         positive_distances = pairwisedistances.__dict__[args.distance_metric](
