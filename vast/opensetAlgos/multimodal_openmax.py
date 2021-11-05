@@ -118,7 +118,7 @@ def MultiModalOpenMax_Training(
                 )
                 # check if unique distances are desired
                 if args.distances_unique:
-                    distances = torch.unique(distances)
+                    distances = torch.unique(distances)[:, None]
 
                 # Rather than continuing now fit_high handels this by returning invalid weibul shape, scale
                 # if distances.shape[0] <= 5:
