@@ -110,7 +110,7 @@ def MultiModalOpenMax_Training(
                 
                 # check if unique distances are desired
                 if args.distances_unique:
-                    distances = torch.unique(distances)
+                    distances = torch.unique(distances)[:, None]
 
                 if distances.shape[0] <= 5:
                     continue
