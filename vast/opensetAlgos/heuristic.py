@@ -91,3 +91,8 @@ def l1_normalization(evt_probs, *args, **kwargs):
     prediction_score[predicted_class == 0] = -1.0
     predicted_class = predicted_class - 1
     return predicted_class, prediction_score
+
+
+def set_shape_scale_defaults(models, set_shape_to, set_scale_to):
+    for cls in models:
+        models[cls]['weibulls'].wbFits[models[cls]['weibulls'].wbFits[:,0] == -1] = torch.Tensor([set_shape_to, set_scale_to])
