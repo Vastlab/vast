@@ -26,3 +26,8 @@ def l1(x, y):
 
 
 __dict__ = {"cosine": cosine, "euclidean": euclidean, "l1": l1}
+
+implemented_distances = []
+for name in sorted(__dict__):
+    if not name.startswith("__"):
+        implemented_distances.append(name)

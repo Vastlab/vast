@@ -46,7 +46,7 @@ def MultiModalOpenMax_Params(parser):
         "--distance_metric",
         default="cosine",
         type=str,
-        choices=list(pairwisedistances.__dict__.keys()),
+        choices=list(pairwisedistances.implemented_distances),
         help="distance metric to use default: %(default)s",
     )
     MultiModalOpenMax_params.add_argument(
