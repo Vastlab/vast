@@ -5,10 +5,13 @@ Vision And Security Technology (VAST) Lab.
 ## Setup
 ### For users
 `pip install git+https://github.com/Vastlab/vast.git`
+
+**NOTE:** There is an unadressed issue due to which the above install makes features like FINCH unable to end user.
+If you intend to use FINCH please follow the for developers instructions below.
 ### For developers
 `git clone --recurse-submodules https://github.com/Vastlab/vast.git`
 
-`pip install -e .`
+`pip install -e .[dev]`
 
 ## Contents:
 ### Loss Functions
