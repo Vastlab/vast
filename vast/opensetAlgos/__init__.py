@@ -9,6 +9,7 @@ __all__ = [
     "EVM_Training",
     "EVM_Inference",
     "EVM_Inference_cpu_max_knowness_prob",
+    "PDW_Params",
     "PDW_Training",
     "PDW_Inference",
 ]
