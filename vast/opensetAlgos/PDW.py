@@ -8,6 +8,7 @@ import argparse
 from typing import Iterator, Tuple, List, Dict
 import torch
 from vast import opensetAlgos
+from ..tools import pairwisedistances
 from vast import tools
 
 def PDW_Params(parser):
@@ -42,7 +43,7 @@ def PDW_Params(parser):
         "--distance_metric",
         default="cosine",
         type=str,
-        choices=list(pairwisedistances.implemented_distances),
+        choices=list(pairwisedistances.__dict__.keys()),
         help="distance metric to use default: %(default)s",
     )
     PDW_params.add_argument(
