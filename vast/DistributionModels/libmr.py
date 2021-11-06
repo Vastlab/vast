@@ -9,6 +9,7 @@ import torch
 class libmr:
     def __init__(self, saved_model=None, translateAmount=1):
         self.translateAmount = translateAmount
+        self.reversed = False
         if saved_model:
             self.wbFits = torch.zeros(saved_model["Scale"].shape[0], 2)
             self.wbFits[:, 1] = saved_model["Scale"]
@@ -51,14 +52,7 @@ class libmr:
         self.splits = 1
         return self._weibullFitting(data, tailSize, isSorted)
 
-    def wscore(self, distances):
-        """
-        This function can calculate scores from various weibulls for a given set of distances
-        :param distances: a 2-D tensor with the number of rows equal to number of samples and number of columns equal to number of weibulls
-        Or
-        a 1-D tensor with number of elements equal to number of test samples
-        :return:
-        """
+    def compute_weibull_object(self, distances):
         self.deviceName = distances.device
         scale_tensor = self.wbFits[:, 1]
         shape_tensor = self.wbFits[:, 0]
@@ -80,7 +74,21 @@ class libmr:
             validate_args=False,
         )
         distances = distances.clamp(min=0)
-        return weibulls.cdf(distances)
+        return weibulls, distances
+
+    def wscore(self, distances):
+        """
+        This function can calculate scores from various weibulls for a given set of distances
+        :param distances: a 2-D tensor with the number of rows equal to number of samples and number of columns equal to number of weibulls
+        Or
+        a 1-D tensor with number of elements equal to number of test samples
+        :return:
+        """
+        weibulls, distances = self.compute_weibull_object(distances)
+        if self.reversed:
+            return 1 - weibulls.cdf(distances)
+        else:
+            return weibulls.cdf(distances)
 
     def _weibullFitting(self, dataTensor, tailSize, isSorted=False, gpu=0):
         self.deviceName = dataTensor.device
@@ -96,11 +104,11 @@ class libmr:
         smallScoreTensor = sortedTensor[:, tailSize - 1].unsqueeze(1)
         processedTensor = sortedTensor + self.translateAmount - smallScoreTensor
         # Returned in the format [Shape,Scale]
+        wbFits = self._fit(processedTensor)
         if self.splits == 1:
-            self.wbFits = self._fit(processedTensor)
+            self.wbFits = wbFits
             self.smallScoreTensor = smallScoreTensor
-        else:
-            return self._fit(processedTensor), smallScoreTensor
+        return wbFits, smallScoreTensor
 
     def _weibullFilltingInBatches(self, dataTensor, tailSize, isSorted=False, gpu=0):
         N = dataTensor.shape[0]
