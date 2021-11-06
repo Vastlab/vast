@@ -4,8 +4,45 @@ Warning: While this wrapper has been written for ease of use, for the purpose of
 overhead both in terms of memory usage and compute.
 """
 
+import argparse
+from typing import Iterator, Tuple, List, Dict
+import torch
 from vast import opensetAlgos
 from vast import tools
+
+def PDW_Params(parser):
+    PDW_params = parser.add_argument_group("PDW params")
+    PDW_params.add_argument(
+        "--distances_unique",
+        action="store_true",
+        default=True,
+        help="Use unique distances during fitting",
+    )
+    PDW_params.add_argument(
+        "--set_shape_to",
+        type=float,
+        default=1.0,
+        help="Set shape to this value if none could be computed : %(default)s",
+    )
+    PDW_params.add_argument(
+        "--set_scale_to",
+        type=float,
+        default=1.0,
+        help="Set scale to this value if none could be computed : %(default)s",
+    )
+    PDW_params.add_argument(
+        '--OOD_Algo',
+        default='OpenMax',
+        type=str,
+        choices=['OpenMax','EVM','Turbo_EVM','MultiModalOpenMax'],
+        help='Name of the openset detection algorithm')
+    known_args, unknown_args = PDW_params.parse_known_args()
+    # Adding Algorithm Params
+    params_parser = argparse.ArgumentParser(parents = [PDW_params], formatter_class = argparse.RawTextHelpFormatter)
+    parser_to_return, algo_params = getattr(opensetAlgos, known_args.OOD_Algo + '_Params')(params_parser)
+
+    return parser_to_return, algo_params
+
 
 def PDW_Training(
     pos_classes_to_process: List[str],
