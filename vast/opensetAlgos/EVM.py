@@ -46,7 +46,7 @@ def EVM_Params(parser):
         "--distance_metric",
         default="euclidean",
         type=str,
-        choices=list(pairwisedistances.__dict__.keys()),
+        choices=list(pairwisedistances.implemented_distances),
         help="distance metric to use\ndefault: %(default)s",
     )
     EVM_params_parser.add_argument(
