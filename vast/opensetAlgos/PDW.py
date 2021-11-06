@@ -53,7 +53,7 @@ def PDW_Params(parser):
         help="Use unique distances during fitting",
     )
     return parser, dict(
-        group_parser=OpenMax_params,
+        group_parser=PDW_Params,
         param_names=("tailsize", "distance_multiplier"),
         param_id_string="TS_{}_DM_{:.2f}",
     )
