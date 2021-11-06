@@ -7,13 +7,14 @@ import torch
 
 
 class weibull:
-    def __init__(self, saved_model=None):
+    def __init__(self, saved_model=None, translateAmount=1):
+        self.translateAmount= translateAmount
         if saved_model:
             self.wbFits = torch.zeros(saved_model["Scale"].shape[0], 2)
             self.wbFits[:, 1] = saved_model["Scale"]
             self.wbFits[:, 0] = saved_model["Shape"]
             self.sign = saved_model["signTensor"]
-            self._ = saved_model["translateAmountTensor"]
+            self.translateAmount = saved_model["translateAmountTensor"]
             self.smallScoreTensor = saved_model["smallScoreTensor"]
         return
 
@@ -26,7 +27,7 @@ class weibull:
             Scale=self.wbFits[:, 1],
             Shape=self.wbFits[:, 0],
             signTensor=self.sign,
-            translateAmountTensor=1,
+            translateAmountTensor=self.translateAmount,
             smallScoreTensor=self.smallScoreTensor,
         )
 
@@ -87,7 +88,7 @@ class weibull:
         smallScoreTensor = self.smallScoreTensor
         if len(self.smallScoreTensor.shape) == 2:
             smallScoreTensor = self.smallScoreTensor[:, 0]
-        distances = distances + 1 - smallScoreTensor.to(self.deviceName)[None, :]
+        distances = distances + self.translateAmount - smallScoreTensor.to(self.deviceName)[None, :]
         weibulls = torch.distributions.weibull.Weibull(
             scale_tensor.to(self.deviceName),
             shape_tensor.to(self.deviceName),
@@ -108,7 +109,7 @@ class weibull:
             ).values
 
         smallScoreTensor = sortedTensor[:, tailSize - 1].unsqueeze(1)
-        processedTensor = sortedTensor + 1 - smallScoreTensor
+        processedTensor = sortedTensor + self.translateAmount - smallScoreTensor
         # Returned in the format [Shape,Scale]
         if self.splits == 1:
             self.wbFits = self._fit(processedTensor)
