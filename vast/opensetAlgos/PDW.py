@@ -24,8 +24,40 @@ def PDW_Params(parser):
         default=1.0,
         help="Set scale to this value if none could be computed : %(default)s",
     )
-    known_args, unknown_args = PDW_params.parse_known_args()
+    PDW_params.add_argument(
+        "--tailsize",
+        nargs="+",
+        type=float,
+        default=[1.0],
+        help="tail size to use default: %(default)s",
+    )
+    PDW_params.add_argument(
+        "--distance_multiplier",
+        nargs="+",
+        type=float,
+        default=[1.0],
+        help="distance multiplier to use default: %(default)s",
+    )
+    PDW_params.add_argument(
+        "--distance_metric",
+        default="cosine",
+        type=str,
+        choices=list(pairwisedistances.implemented_distances),
+        help="distance metric to use default: %(default)s",
+    )
+    PDW_params.add_argument(
+        "--distances_unique",
+        action="store_true",
+        default=False,
+        help="Use unique distances during fitting",
+    )
+    return parser, dict(
+        group_parser=OpenMax_params,
+        param_names=("tailsize", "distance_multiplier"),
+        param_id_string="TS_{}_DM_{:.2f}",
+    )
 
+    """
     if "OOD_Algo" not in known_args.__dict__ and "OOD_Algo" not in unknown_args.__dict__:
         known_args.OOD_Algo="OpenMax"
     else:
@@ -39,7 +71,7 @@ def PDW_Params(parser):
     parser_to_return, algo_params = getattr(opensetAlgos, known_args.OOD_Algo + '_Params')(params_parser)
 
     return parser_to_return, algo_params
-
+    """
 
 def PDW_Training(
     pos_classes_to_process: List[str],
