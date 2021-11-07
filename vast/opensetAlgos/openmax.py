@@ -82,18 +82,20 @@ def OpenMax_Training(
     :return: Iterator(Tuple(parameter combination identifier, Tuple(class name, its evm model)))
     """
     if "translateAmount" not in args.__dict__:
-        args.translateAmount=1
-        
+        args.translateAmount = 1
+    device = "cpu" if gpu == -1 else f"cuda:{gpu}"
     for pos_cls_name in pos_classes_to_process:
-        features = features_all_classes[pos_cls_name].clone().to(f"cuda:{gpu}")
-        MAV = torch.mean(features, dim=0).to(f"cuda:{gpu}")
+        features = features_all_classes[pos_cls_name].clone().to(device)
+        MAV = torch.mean(features, dim=0).to(device)
         distances = pairwisedistances.__dict__[args.distance_metric](
             features, MAV[None, :]
         )
         for tailsize, distance_multiplier in itertools.product(
             args.tailsize, args.distance_multiplier
         ):
-            weibull_model = fit_high(distances.T, distance_multiplier, tailsize, args.translateAmount)
+            weibull_model = fit_high(
+                distances.T, distance_multiplier, tailsize, args.translateAmount
+            )
             yield (
                 f"TS_{tailsize}_DM_{distance_multiplier:.2f}",
                 (pos_cls_name, dict(MAV=MAV.cpu()[None, :], weibulls=weibull_model)),
@@ -117,11 +119,12 @@ def OpenMax_Inference(
     :param models: The collated model created for a single hyper parameter combination.
     :return: Iterator(Tuple(str, Tuple(batch_identifier, torch.Tensor)))
     """
+    device = "cpu" if gpu == -1 else f"cuda:{gpu}"
     for batch_to_process in pos_classes_to_process:
-        features = features_all_classes[batch_to_process].to(f"cuda:{gpu}")
+        features = features_all_classes[batch_to_process].to(device)
         probs = []
         for class_name in sorted(models.keys()):
-            MAV = models[class_name]["MAV"].to(f"cuda:{gpu}")
+            MAV = models[class_name]["MAV"].double().to(device)
             distances = pairwisedistances.__dict__[args.distance_metric](features, MAV)
             probs.append(1 - models[class_name]["weibulls"].wscore(distances.cpu()))
         probs = torch.cat(probs, dim=1)

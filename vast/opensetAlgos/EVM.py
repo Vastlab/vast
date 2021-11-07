@@ -178,6 +178,7 @@ def EVM_Training(
     The results are provided as a Tuple(str, Tuple2), where the str entry tells the hyper parameter combination.
     The Tuple2 contains the name of the class and its corresponding EVM model.
     """
+    device = "cpu" if gpu == -1 else f"cuda:{gpu}"
     negative_classes_for_current_batch = []
     no_of_negative_classes_for_current_batch = 0
     temp = []
@@ -191,7 +192,7 @@ def EVM_Training(
         negative_classes_for_current_batch.append(torch.cat(temp))
     for pos_cls_name in pos_classes_to_process:
         # Find positive class features
-        positive_cls_feature = features_all_classes[pos_cls_name].to(f"cuda:{gpu}")
+        positive_cls_feature = features_all_classes[pos_cls_name].to(device)
         tailsize = max(args.tailsize)
         if tailsize <= 1:
             tailsize = tailsize * positive_cls_feature.shape[0]
@@ -220,7 +221,7 @@ def EVM_Training(
                 f"neg_features {neg_features.shape}"
             )
             distances = pairwisedistances.__dict__[args.distance_metric](
-                positive_cls_feature, neg_features.to(f"cuda:{gpu}")
+                positive_cls_feature, neg_features.to(device)
             )
             bottom_k_distances.append(distances.cpu())
             bottom_k_distances = torch.cat(bottom_k_distances, dim=1)
@@ -235,7 +236,7 @@ def EVM_Training(
                 ).values
             ]
             del distances
-        bottom_k_distances = bottom_k_distances[0].to(f"cuda:{gpu}")
+        bottom_k_distances = bottom_k_distances[0].to(device)
 
         # Find distances to other samples of same class
         positive_distances = pairwisedistances.__dict__[args.distance_metric](
@@ -259,13 +260,13 @@ def EVM_Training(
             # Perform actual EVM training
             weibull_model = fit_low(bottom_k_distances, distance_multiplier, tailsize, gpu)
             extreme_vectors_models, extreme_vectors_indexes, covered_vectors = set_cover(
-                weibull_model, positive_distances.to(f"cuda:{gpu}"), cover_threshold
+                weibull_model, positive_distances.to(device), cover_threshold
             )
             extreme_vectors = torch.gather(
                 positive_cls_feature,
                 0,
                 extreme_vectors_indexes[:, None]
-                .to(f"cuda:{gpu}")
+                .to(device)
                 .repeat(1, positive_cls_feature.shape[1]),
             )
             extreme_vectors_models.tocpu()
@@ -305,13 +306,14 @@ def EVM_Inference(
     :param models: The collated model created for a single hyper parameter combination.
     :return: Iterator(Tuple(str, Tuple(batch_identifier, torch.Tensor)))
     """
+    device = "cpu" if gpu == -1 else f"cuda:{gpu}"
     for batch_to_process in pos_classes_to_process:
-        test_cls_feature = features_all_classes[batch_to_process].to(f"cuda:{gpu}")
+        test_cls_feature = features_all_classes[batch_to_process].to(device)
         assert test_cls_feature.shape[0] != 0
         probs = []
         for cls_no, cls_name in enumerate(sorted(models.keys())):
             distances = pairwisedistances.__dict__[args.distance_metric](
-                test_cls_feature, models[cls_name]["extreme_vectors"].to(f"cuda:{gpu}")
+                test_cls_feature, models[cls_name]["extreme_vectors"].double().to(device)
             )
             probs_current_class = models[cls_name]["weibulls"].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
