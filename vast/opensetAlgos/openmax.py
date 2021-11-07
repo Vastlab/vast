@@ -48,6 +48,12 @@ def OpenMax_Params(parser):
         default=False,
         help="Use unique distances during fitting",
     )
+    OpenMax_params.add_argument(
+        "--translateAmount",
+        type=float,
+        default=1.0,
+        help="translateAmount to use default: %(default)s",
+    )
     return parser, dict(
         group_parser=OpenMax_params,
         param_names=("tailsize", "distance_multiplier"),
@@ -55,7 +61,7 @@ def OpenMax_Params(parser):
     )
 
 
-def fit_high(distances, distance_multiplier, tailsize):
+def fit_high(distances, distance_multiplier, tailsize, translateAmount=1):
     if tailsize <= 1:
         tailsize = min(tailsize * distances.shape[1], distances.shape[1])
     tailsize = int(min(tailsize, distances.shape[1]))
@@ -64,13 +70,13 @@ def fit_high(distances, distance_multiplier, tailsize):
                 dict(
                     Scale=torch.Tensor([-1]),
                     Shape=torch.Tensor([-1]),
-                    translateAmountTensor=torch.Tensor([0.0]),               
+                    translateAmountTensor=0.0,
                     signTensor= 1,
                     smallScoreTensor=torch.Tensor([0.0]),
                 )
             )
     else:
-        mr = weibull.weibull()
+        mr = weibull.weibull(translateAmount=translateAmount)
         mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
     mr.tocpu()
     return mr
@@ -91,6 +97,8 @@ def OpenMax_Training(
     :param models: Not used during training, input ignored.
     :return: Iterator(Tuple(parameter combination identifier, Tuple(class name, its evm model)))
     """
+    if "translateAmount" not in args.__dict__:
+        args.translateAmount=1
     for pos_cls_name in pos_classes_to_process:
         features = features_all_classes[pos_cls_name].clone().to(f"cuda:{gpu}")
         MAV = torch.mean(features, dim=0).to(f"cuda:{gpu}")
@@ -103,8 +111,7 @@ def OpenMax_Training(
             # check if unique distances are desired
             if args.distances_unique:
                 distances = torch.unique(distances)[:, None]
-
-            weibull_model = fit_high(distances.T, distance_multiplier, tailsize)
+            weibull_model = fit_high(distances.T, distance_multiplier, tailsize, translateAmount=args.translateAmount)
             yield (
                 f"TS_{tailsize}_DM_{distance_multiplier:.2f}",
                 (pos_cls_name, dict(MAV=MAV.cpu()[None, :], weibulls=weibull_model)),

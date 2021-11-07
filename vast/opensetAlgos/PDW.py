@@ -61,6 +61,12 @@ def PDW_Params(parser):
         choices=['OpenMax','EVM','Turbo_EVM','MultiModalOpenMax'],
         help='Name of the openset detection algorithm'
     )
+    PDW_params.add_argument(
+        "--translateAmount",
+        type=float,
+        default=1.0,
+        help="translateAmount to use default: %(default)s",
+    )
     return parser, dict(
         group_parser=PDW_Params,
         param_names=("tailsize", "distance_multiplier"),
