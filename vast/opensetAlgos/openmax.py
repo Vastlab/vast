@@ -55,6 +55,12 @@ def OpenMax_Params(parser):
         default=False,
         help="Use unique distances during fitting",
     )
+    OpenMax_params.add_argument(
+        "--translateAmount",
+        type=float,
+        default=1.0,
+        help="translateAmount to use default: %(default)s",
+    )
     return parser, dict(
         group_parser=OpenMax_params,
         param_names=("tailsize", "distance_multiplier"),
@@ -71,15 +77,14 @@ def fit_high(distances, distance_multiplier, tailsize, translateAmount=1):
                 dict(
                     Scale=torch.Tensor([-1]),
                     Shape=torch.Tensor([-1]),
-                    translateAmountTensor=torch.Tensor([0.0]),               
+                    translateAmountTensor=translateAmount,
                     signTensor= 1,
                     smallScoreTensor=torch.Tensor([0.0]),
-                    translateAmount=translateAmount
                 )
             )
     else:
-        mr = weibull.weibull()
-        mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False, translateAmount=translateAmount)
+        mr = weibull.weibull(translateAmount=translateAmount)
+        mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
     mr.tocpu()
     return mr
 
@@ -114,8 +119,7 @@ def OpenMax_Training(
             # check if unique distances are desired
             if args.distances_unique:
                 distances = torch.unique(distances)[:, None]
-
-            weibull_model = fit_high(distances.T, distance_multiplier, tailsize, args.translateAmount)
+            weibull_model = fit_high(distances.T, distance_multiplier, tailsize, translateAmount=args.translateAmount)
             yield (
                 f"TS_{tailsize}_DM_{distance_multiplier:.2f}",
                 (pos_cls_name, dict(MAV=MAV.cpu()[None, :], weibulls=weibull_model)),
