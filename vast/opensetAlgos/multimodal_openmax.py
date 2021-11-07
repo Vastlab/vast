@@ -73,6 +73,8 @@ def MultiModalOpenMax_Training(
     """
     from ..clusteringAlgos import clustering
 
+    device = "cpu" if gpu == -1 else f"cuda:{gpu}"
+
     for pos_cls_name in pos_classes_to_process:
         features = features_all_classes[pos_cls_name]
         # clustering
@@ -85,7 +87,7 @@ def MultiModalOpenMax_Training(
             verbose=False,
             distance_metric=args.distance_metric,
         )
-        features = features.to(f"cuda:{gpu}")
+        features = features.to(device)
         centroids = centroids.type(features.dtype)
         # TODO: This grid search is not optimized for speed due to redundant distance computation,
         #  needs to be improved if grid search for MultiModal OpenMax is used extensively on big datasets.
@@ -96,8 +98,8 @@ def MultiModalOpenMax_Training(
             wbFits = []
             smallScoreTensor = []
             for MAV_no in set(assignments.cpu().tolist()) - {-1}:
-                MAV = centroids[MAV_no, :].to(f"cuda:{gpu}")
-                f = features[assignments == MAV_no].to(f"cuda:{gpu}")
+                MAV = centroids[MAV_no, :].to(device)
+                f = features[assignments == MAV_no].to(device)
                 distances = pairwisedistances.__dict__[args.distance_metric](
                     f, MAV[None, :]
                 )
@@ -149,12 +151,13 @@ def MultiModalOpenMax_Inference(
     :param models: The collated model created for a single hyper parameter combination.
     :return: Iterator(Tuple(str, Tuple(batch_identifier, torch.Tensor)))
     """
+    device = "cpu" if gpu == -1 else f"cuda:{gpu}"
     for batch_to_process in pos_classes_to_process:
-        test_cls_feature = features_all_classes[batch_to_process].to(f"cuda:{gpu}")
+        test_cls_feature = features_all_classes[batch_to_process].to(device)
         probs = []
         for cls_no, cls_name in enumerate(sorted(models.keys())):
             distances = pairwisedistances.__dict__[args.distance_metric](
-                test_cls_feature, models[cls_name]["MAVs"].to(f"cuda:{gpu}").double()
+                test_cls_feature, models[cls_name]["MAVs"].to(device).double()
             )
             probs_current_class = 1 - models[cls_name]["weibulls"].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
