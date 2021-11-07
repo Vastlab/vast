@@ -36,6 +36,13 @@ def MultiModalOpenMax_Params(parser):
         help="distance multiplier to use default: %(default)s",
     )
     MultiModalOpenMax_params.add_argument(
+        "--translateAmount",
+        nargs="+",
+        type=float,
+        default=1.0,
+        help="translateAmount to use default: %(default)s",
+    )
+    MultiModalOpenMax_params.add_argument(
         "--distance_metric",
         default="cosine",
         type=str,
@@ -103,8 +110,9 @@ def MultiModalOpenMax_Training(
                 distances = pairwisedistances.__dict__[args.distance_metric](
                     f, MAV[None, :]
                 )
-                if distances.shape[0] <= 5:
-                    continue
+                # Rather than continuing now fit_high handels this by returning invalid weibul shape, scale
+                # if distances.shape[0] <= 5:
+                #     continue
                 weibull_model = fit_high(distances.T, distance_multiplier, tailsize)
                 MAVs.append(MAV)
                 wbFits.append(weibull_model.wbFits)
@@ -123,7 +131,7 @@ def MultiModalOpenMax_Training(
                     Scale=wbFits[:, 1],
                     Shape=wbFits[:, 0],
                     signTensor=weibull_model.sign,
-                    translateAmountTensor=None,
+                    translateAmountTensor=args.translateAmount,
                     smallScoreTensor=smallScoreTensor,
                 )
             )
