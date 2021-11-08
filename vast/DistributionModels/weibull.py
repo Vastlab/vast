@@ -12,11 +12,11 @@ class weibull(libmr):
         maxval = data.max(dim=1).values
         # flip the data around the max so the smallest points are just beyond the data but mirrors the distribution
         data = 2 * maxval - data
-        return self.FitLow(self, data, tailSize, isSorted=isSorted, gpu=gpu)
+        return self.FitLow(data, tailSize, isSorted=isSorted, gpu=gpu)
 
     def FitLowReversed(self, data, tailSize, isSorted=False, gpu=0):
         self.reversed = True
-        return self.FitLow(self, data, tailSize, isSorted=isSorted, gpu=gpu)
+        return self.FitLow(data, tailSize, isSorted=isSorted, gpu=gpu)
 
     def prob(self, distances):
         """
