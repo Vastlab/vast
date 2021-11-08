@@ -146,6 +146,8 @@ class libmr:
 
     def _fit(self, data, iters=100, eps=1e-6):
         """
+        Adapted from: https://github.com/mlosch/python-weibullfit/blob/0fc6fbe5103c5a2e3ac3374433978f0b816b70be/weibull/backend_pytorch.py#L5
+        Adds functionality to fit multiple weibull models in a single tensor using 2D torch tensors.
         Fits multiple 2-parameter Weibull distributions to the given data using maximum-likelihood estimation.
         :param data: 2d-tensor of samples. Each value must satisfy x > 0.
         :param iters: Maximum number of iterations
