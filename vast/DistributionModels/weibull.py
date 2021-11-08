@@ -9,7 +9,7 @@ from .libmr import libmr
 class weibull(libmr):
     # TB's new mode that flips the data around the max and then does a fit low reject so that its effectively modeling just above the max .
     def FitHighFlipped(self, data, tailSize, isSorted=False, gpu=0):
-        maxval = data.max()
+        maxval = data.max(dim=1).values
         # flip the data around the max so the smallest points are just beyond the data but mirrors the distribution
         data = 2 * maxval - data
         return self.FitLow(self, data, tailSize, isSorted=isSorted, gpu=gpu)
