@@ -116,6 +116,7 @@ def MultiModalOpenMax_Training(
                 distances = pairwisedistances.__dict__[args.distance_metric](
                     f, MAV[None, :]
                 )
+
                 # check if unique distances are desired
                 if args.distances_unique:
                     distances = torch.unique(distances)[:, None]
@@ -123,7 +124,9 @@ def MultiModalOpenMax_Training(
                 # Rather than continuing now fit_high handels this by returning invalid weibul shape, scale
                 # if distances.shape[0] <= 5:
                 #     continue
-                weibull_model = fit_high(distances.T, distance_multiplier, tailsize, args.translateAmount)
+                weibull_model = fit_high(
+                    distances.T, distance_multiplier, tailsize, args.translateAmount
+                )
                 MAVs.append(MAV)
                 wbFits.append(weibull_model.wbFits)
                 smallScoreTensor.append(weibull_model.smallScoreTensor)

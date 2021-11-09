@@ -74,14 +74,14 @@ def fit_high(distances, distance_multiplier, tailsize, translateAmount=1):
     tailsize = int(min(tailsize, distances.shape[1]))
     if distances.shape[1] < 5:
         mr = weibull.weibull(
-                dict(
-                    Scale=torch.Tensor([-1]),
-                    Shape=torch.Tensor([-1]),
-                    translateAmountTensor=translateAmount,
-                    signTensor= 1,
-                    smallScoreTensor=torch.Tensor([0.0]),
-                )
+            dict(
+                Scale=torch.Tensor([-1]),
+                Shape=torch.Tensor([-1]),
+                translateAmountTensor=translateAmount,
+                signTensor=1,
+                smallScoreTensor=torch.Tensor([0.0]),
             )
+        )
     else:
         mr = weibull.weibull(translateAmount=translateAmount)
         mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
@@ -119,7 +119,12 @@ def OpenMax_Training(
             # check if unique distances are desired
             if args.distances_unique:
                 distances = torch.unique(distances)[:, None]
-            weibull_model = fit_high(distances.T, distance_multiplier, tailsize, translateAmount=args.translateAmount)
+            weibull_model = fit_high(
+                distances.T,
+                distance_multiplier,
+                tailsize,
+                translateAmount=args.translateAmount,
+            )
             yield (
                 f"TS_{tailsize}_DM_{distance_multiplier:.2f}",
                 (pos_cls_name, dict(MAV=MAV.cpu()[None, :], weibulls=weibull_model)),

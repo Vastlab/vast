@@ -72,14 +72,14 @@ def EVM_Params(parser):
 def fit_low(distances, distance_multiplier, tailsize, gpu):
     if distances.shape[1] < 5:
         mr = weibull.weibull(
-                dict(
-                    Scale=torch.Tensor([-1]),
-                    Shape=torch.Tensor([-1]),
-                    translateAmountTensor=torch.Tensor([0.0]),               
-                    signTensor= -1,
-                    smallScoreTensor=torch.Tensor([0.0]),
-                )
+            dict(
+                Scale=torch.Tensor([-1]),
+                Shape=torch.Tensor([-1]),
+                translateAmountTensor=torch.Tensor([0.0]),
+                signTensor=-1,
+                smallScoreTensor=torch.Tensor([0.0]),
             )
+        )
     else:
         mr = weibull.weibull()
         mr.FitLow(
