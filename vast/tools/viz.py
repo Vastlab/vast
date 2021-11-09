@@ -74,6 +74,13 @@ def plot_histogram(
     plt.show()
 
 
+def get_probs(pnts, pred_weights):
+    e_ = np.exp(np.dot(pnts, pred_weights))
+    e_ = e_ / np.sum(e_, axis=1)[:, None]
+    res = np.max(e_, axis=1)
+    return res
+
+
 def plotter_2D(
     pos_features,
     labels,
@@ -83,10 +90,12 @@ def plotter_2D(
     title=None,
     file_name="foo.pdf",
     final=False,
-    pred_weights=None,
     heat_map=False,
+    prob_function=get_probs,
+    *args,
+    **kwargs,
 ):
-    plt.figure(figsize=[6, 6])
+    fig, ax = plt.subplots(figsize=(6, 6))
 
     if heat_map:
         min_x, max_x = np.min(pos_features[:, 0]), np.max(pos_features[:, 0])
@@ -96,11 +105,18 @@ def plotter_2D(
         pnts = list(itertools.chain(itertools.product(x, y)))
         pnts = np.array(pnts)
 
-        e_ = np.exp(np.dot(pnts, pred_weights))
-        e_ = e_ / np.sum(e_, axis=1)[:, None]
-        res = np.max(e_, axis=1)
+        res = prob_function(pnts, *args, **kwargs)
 
-        plt.pcolor(x, y, np.array(res).reshape(200, 200).transpose(), rasterized=True)
+        heat_map = ax.pcolor(
+            x,
+            y,
+            np.array(res).reshape(200, 200).transpose(),
+            rasterized=True,
+            shading="auto",
+            vmin=0.0,
+            vmax=1.0,
+        )
+        fig.colorbar(heat_map, ax=ax)
 
     colors = colors_global
     if neg_features is not None:
@@ -120,7 +136,7 @@ def plotter_2D(
     for i, l in enumerate(set(labels.tolist())):
         labels_to_int[labels == l] = i
 
-    plt.scatter(
+    ax.scatter(
         pos_features[:, 0],
         pos_features[:, 1],
         c=colors_with_repetition[labels_to_int.astype(np.int)],
@@ -128,7 +144,7 @@ def plotter_2D(
         s=5,
     )
     if neg_features is not None:
-        plt.scatter(
+        ax.scatter(
             neg_features[:, 0],
             neg_features[:, 1],
             c="k",
@@ -137,11 +153,11 @@ def plotter_2D(
             marker="*",
         )
     if final:
-        plt.gca().spines["right"].set_position("zero")
-        plt.gca().spines["bottom"].set_position("zero")
-        plt.gca().spines["left"].set_visible(False)
-        plt.gca().spines["top"].set_visible(False)
-        plt.tick_params(
+        fig.gca().spines["right"].set_position("zero")
+        fig.gca().spines["bottom"].set_position("zero")
+        fig.gca().spines["left"].set_visible(False)
+        fig.gca().spines["top"].set_visible(False)
+        ax.tick_params(
             axis="both",
             bottom=False,
             left=False,
@@ -150,10 +166,10 @@ def plotter_2D(
             labelleft=False,
             labelright=False,
         )
-        plt.axis("equal")
+        ax.axis("equal")
 
-    plt.savefig(file_name.format("2D_plot", "png"), bbox_inches="tight")
-    plt.show()
+    fig.savefig(file_name.format("2D_plot", "png"), bbox_inches="tight")
+    fig.show()
     if neg_features is not None:
         plot_histogram(
             pos_features,
