@@ -3,10 +3,10 @@ Author: Terrance E. Boult.
 This class extends the default libmr and aims to provide more useful curve fitting options.
 """
 import torch
-from .libmr import libmr
+from vast.DistributionModels.libmrTorch import libmr as libmrTorch
 
 
-class weibull(libmr):
+class weibull(libmrTorch):
     # TB's new mode that flips the data around the max and then does a fit low reject so that its effectively modeling just above the max .
     def FitHighFlipped(self, data, tailSize, isSorted=False, gpu=0):
         maxval = data.max(dim=1).values
