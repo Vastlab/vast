@@ -58,12 +58,14 @@ class LeNet_plus_plus(nn.Module):
             else:
                 self.fc2 = nn.Linear(in_features=2, out_features=num_classes, bias=True)
         self.use_classification_layer = use_classification_layer
-        self.prelu_act = nn.PReLU()
+        self.prelu_act1 = nn.PReLU()
+        self.prelu_act2 = nn.PReLU()
+        self.prelu_act3 = nn.PReLU()
 
     def forward(self, x):
-        x = self.prelu_act(self.pool(self.batch_norm1(self.conv1_2(self.conv1_1(x)))))
-        x = self.prelu_act(self.pool(self.batch_norm2(self.conv2_2(self.conv2_1(x)))))
-        x = self.prelu_act(self.pool(self.batch_norm3(self.conv3_2(self.conv3_1(x)))))
+        x = self.prelu_act1(self.pool(self.batch_norm1(self.conv1_2(self.conv1_1(x)))))
+        x = self.prelu_act2(self.pool(self.batch_norm2(self.conv2_2(self.conv2_1(x)))))
+        x = self.prelu_act3(self.pool(self.batch_norm3(self.conv3_2(self.conv3_1(x)))))
         x = x.view(-1, self.conv3_2.out_channels * 3 * 3)
         y = self.fc1(x)
         if self.use_classification_layer:
