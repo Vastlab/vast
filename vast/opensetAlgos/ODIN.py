@@ -27,6 +27,55 @@ def ODIN_Params(parser):
     )
 
 
+def __run_for_all_parameters__(
+    args, net, data, normalization, current_class_results, device
+):
+    criterion = torch.nn.CrossEntropyLoss(reduction="none")
+    softmax_op = torch.nn.Softmax(dim=1)
+
+    data = data.to(device)
+    data.requires_grad = True
+    original_output = net(data)
+    # We want output of the last layer
+    if type(original_output) == tuple:
+        original_output = original_output[0]
+    labels = original_output.detach().argmax(dim=1)
+
+    for temperature in args.temperature:
+        # Using temperature scaling
+        temperature_scaled_output = original_output / temperature
+        loss = criterion(temperature_scaled_output, labels)
+        loss.backward(gradient=torch.ones_like(loss), retain_graph=True)
+
+        # Take the sign of the gradient and convert it into actual image max normalized value
+        gradient_sign = data.grad.sign().to(device)
+        if normalization is not None:
+            # Scale gradient values to the actual image normalization values
+            gradient_sign = gradient_sign * normalization(
+                torch.ones(gradient_sign.shape[1:]).to(device)
+            )
+
+        noise_to_add = (
+            torch.tensor(args.epsilon)[:, None, None, None].to(device)
+            * gradient_sign[0, ...]
+        )
+        noisy_inputs = noise_to_add + data.detach()
+        if normalization is None:
+            noisy_inputs = noisy_inputs.clamp(min=0.0, max=1.0)
+        noisy_output = net(noisy_inputs)
+        if type(noisy_output) == tuple:
+            noisy_output = noisy_output[0]
+        noisy_output = noisy_output / temperature
+        probs = softmax_op(noisy_output)
+        scores, prediction = probs.max(dim=1)
+        scores, prediction = scores.cpu(), prediction.cpu()
+
+        for epsilon, s, p in zip(args.epsilon, scores.tolist(), prediction.tolist()):
+            current_class_results[f"T_{temperature}_E_{epsilon}"].append([s, p])
+        data.grad.zero_()
+    return current_class_results
+
+
 def ODIN_Training(dataset, net, args, gpu, state_dict=None):
     """
     ODIN Training only has parameter optimization.
@@ -58,9 +107,8 @@ def ODIN_Training(dataset, net, args, gpu, state_dict=None):
 
     if state_dict is not None:
         net.load_state_dict(torch.load(state_dict))
-    net.to(f"cuda:{gpu}")
-    criterion = torch.nn.CrossEntropyLoss(reduction="none")
-    softmax_op = torch.nn.Softmax(dim=1)
+    device = f"cuda:{gpu}"
+    net.to(device)
     normalization = None
     if type(dataloader.dataset.transform) == transforms.transforms.Compose:
         for t in dataloader.dataset.transform.transforms:
@@ -86,45 +134,10 @@ def ODIN_Training(dataset, net, args, gpu, state_dict=None):
                 current_class_results[k] = []
             current_class = cls
 
-        data = data.to(f"cuda:{gpu}")
-        data.requires_grad = True
-        original_output = net(data)
-        if type(original_output) == tuple:
-            original_output = original_output[0]
-        labels = original_output.detach().argmax(dim=1)
+        current_class_results = __run_for_all_parameters__(
+            args, net, data, normalization, current_class_results, device
+        )
 
-        for temperature in args.temperature:
-            # Using temperature scaling
-            temperature_scaled_output = original_output / temperature
-            loss = criterion(temperature_scaled_output, labels)
-            loss.backward(gradient=torch.ones_like(loss), retain_graph=True)
-
-            # Take the sign of the gradient and convert it into actual image max normalized value
-            gradient_sign = data.grad.sign().to(f"cuda:{gpu}")
-            if normalization is not None:
-                # Scale gradient values to the actual image normalization values
-                gradient_sign = gradient_sign * normalization(
-                    torch.ones(gradient_sign.shape[1:]).to(f"cuda:{gpu}")
-                )
-
-            noise_to_add = (
-                torch.tensor(args.epsilon)[:, None, None, None].cuda()
-                * gradient_sign[0, ...]
-            )
-            noisy_inputs = noise_to_add + data.detach()
-            if normalization is None:
-                noisy_inputs = noisy_inputs.clamp(min=0.0, max=1.0)
-            noisy_output = net(noisy_inputs)
-            if type(noisy_output) == tuple:
-                noisy_output = noisy_output[0]
-            noisy_output = noisy_output / temperature
-            probs = softmax_op(noisy_output)
-            scores, prediction = probs.max(dim=1)
-            scores, prediction = scores.cpu(), prediction.cpu()
-
-            for epsilon, s, p in zip(args.epsilon, scores.tolist(), prediction.tolist()):
-                current_class_results[f"T_{temperature}_E_{epsilon}"].append([s, p])
-            data.grad.zero_()
     for k in current_class_results:
         yield (k, (cls, torch.tensor(current_class_results[k])))
     logger.debug(f"Completed class {cls}")
