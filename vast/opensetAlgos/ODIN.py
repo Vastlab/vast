@@ -1,3 +1,15 @@
+"""
+Author: Akshay Raj Dhamija
+This is a reimplementation of ODIN that allows to search for hyper parameters such as temperature and epsilon
+while reducing redundant computation and performing what it can in batch sizes greater than 1.
+
+@inproceedings{liang2018enhancing,
+  title={Enhancing The Reliability of Out-of-distribution Image Detection in Neural Networks},
+  author={Liang, Shiyu and Li, Yixuan and Srikant, R},
+  booktitle={International Conference on Learning Representations},
+  year={2018}
+}
+"""
 import itertools
 import torch
 import torchvision.transforms as transforms
@@ -23,7 +35,7 @@ def ODIN_Params(parser):
     return parser, dict(
         group_parser=ODIN_Params,
         param_names=("temperature", "epsilon"),
-        param_id_string="T_{}_E_{}",
+        param_id_string="T_{}_E_{:.6f}",
     )
 
 
@@ -71,7 +83,7 @@ def __run_for_all_parameters__(
         scores, prediction = scores.cpu(), prediction.cpu()
 
         for epsilon, s, p in zip(args.epsilon, scores.tolist(), prediction.tolist()):
-            current_class_results[f"T_{temperature}_E_{epsilon}"].append([s, p])
+            current_class_results[f"T_{temperature}_E_{epsilon:.6f}"].append([s, p])
         data.grad.zero_()
     return current_class_results
 
@@ -117,7 +129,7 @@ def ODIN_Training(dataset, net, args, gpu, state_dict=None):
 
     current_class_results = {}
     for temperature, epsilon in itertools.product(args.temperature, args.epsilon):
-        current_class_results[f"T_{temperature}_E_{epsilon}"] = []
+        current_class_results[f"T_{temperature}_E_{epsilon:.6f}"] = []
 
     current_class = None
     cls_counter = 0
