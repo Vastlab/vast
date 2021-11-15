@@ -32,12 +32,13 @@ class libmr:
             smallScoreTensor=self.smallScoreTensor,
         )
 
-    def FitLow(self, data, tailSize, isSorted=False, gpu=0):
+    def FitLow(self, data, tailSize, isSorted=False, gpu=0, isReversed=False):
         """
         data --> 5000 weibulls on 0 dim
              --> 10000 distances for each weibull on 1 dim
         """
         self.sign = -1
+        self.reversed = isReversed
         max_tailsize_in_1_chunk = 100000
         if tailSize <= max_tailsize_in_1_chunk:
             self.splits = 1
@@ -47,10 +48,11 @@ class libmr:
             to_return = self._weibullFilltingInBatches(data, tailSize, isSorted, gpu)
         return to_return
 
-    def FitHigh(self, data, tailSize, isSorted=False):
+    def FitHigh(self, data, tailSize, isSorted=False, gpu=0, isReversed=False):
         self.sign = 1
         self.splits = 1
-        return self._weibullFitting(data, tailSize, isSorted)
+        self.reversed = isReversed
+        return self._weibullFitting(data, tailSize, isSorted, gpu)
 
     def compute_weibull_object(self, distances):
         self.deviceName = distances.device

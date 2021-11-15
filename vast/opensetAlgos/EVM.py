@@ -70,6 +70,7 @@ def fit_low(distances, distance_multiplier, tailsize, gpu):
         min(tailsize, distances.shape[1]),
         isSorted=False,
         gpu=gpu,
+        isReversed=False,
     )
     return mr
 

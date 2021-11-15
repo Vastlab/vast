@@ -8,17 +8,14 @@ from vast.DistributionModels.libmrTorch import libmr as libmrTorch
 
 class weibull(libmrTorch):
     # TB's new mode that flips the data around the max and then does a fit low reject so that its effectively modeling just above the max .
-    def FitHighFlipped(self, data, tailSize, isSorted=False, gpu=0):
+    def FitLowNormalized(self, data, tailSize, isSorted=False, gpu=0):
         maxval = data.max(dim=1).values
-        # flip the data around the max so the smallest points are just beyond the data but mirrors the distribution
+        # Flip the data around the max so the smallest points are just beyond the data but mirrors the distribution
         data = 2 * maxval - data
+        # Because of the flipping of the data, probability of unknown is returned
         return self.FitLow(data, tailSize, isSorted=isSorted, gpu=gpu)
 
-    def FitLowReversed(self, data, tailSize, isSorted=False, gpu=0):
-        self.reversed = True
-        return self.FitLow(data, tailSize, isSorted=isSorted, gpu=gpu)
-
-    def prob(self, distances):
+    def pdf(self, distances):
         """
         This function can calculate raw probability scores from various weibulls for a given set of distances
         :param distances: a 2-D tensor with the number of rows equal to number of samples and number of columns equal to number of weibulls
