@@ -167,7 +167,7 @@ def MultiModalOpenMax_Inference(
             distances = pairwisedistances.__dict__[args.distance_metric](
                 test_cls_feature, models[cls_name]["MAVs"].to(device).double()
             )
-            probs_current_class = 1 - models[cls_name]["weibulls"].wscore(distances)
+            probs_current_class = models[cls_name]["weibulls"].wscore(distances)
             probs.append(torch.max(probs_current_class, dim=1).values)
         probs = torch.stack(probs, dim=-1).cpu()
         yield ("probs", (batch_to_process, probs))
