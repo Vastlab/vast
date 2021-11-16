@@ -61,7 +61,7 @@ def fit_high(distances, distance_multiplier, tailsize, translateAmount=1):
         tailsize = min(tailsize * distances.shape[1], distances.shape[1])
     tailsize = int(min(tailsize, distances.shape[1]))
     mr = weibull.weibull(translateAmount=translateAmount)
-    mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False, isReversed=True)
+    mr.FitHigh(distances.double() * distance_multiplier, tailsize, isSorted=False)
     mr.tocpu()
     return mr
 
@@ -126,6 +126,6 @@ def OpenMax_Inference(
         for class_name in sorted(models.keys()):
             MAV = models[class_name]["MAV"].double().to(device)
             distances = pairwisedistances.__dict__[args.distance_metric](features, MAV)
-            probs.append(models[class_name]["weibulls"].wscore(distances.cpu()))
+            probs.append(models[class_name]["weibulls"].wscore(distances.cpu(), isReversed=True))
         probs = torch.cat(probs, dim=1)
         yield ("probs", (batch_to_process, probs))

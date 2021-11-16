@@ -9,7 +9,6 @@ import torch
 class libmr:
     def __init__(self, saved_model=None, translateAmount=1):
         self.translateAmount = translateAmount
-        self.reversed = False
         if saved_model:
             self.wbFits = torch.zeros(saved_model["Scale"].shape[0], 2)
             self.wbFits[:, 1] = saved_model["Scale"]
@@ -32,13 +31,12 @@ class libmr:
             smallScoreTensor=self.smallScoreTensor,
         )
 
-    def FitLow(self, data, tailSize, isSorted=False, gpu=0, isReversed=False):
+    def FitLow(self, data, tailSize, isSorted=False, gpu=0):
         """
         data --> 5000 weibulls on 0 dim
              --> 10000 distances for each weibull on 1 dim
         """
         self.sign = -1
-        self.reversed = isReversed
         max_tailsize_in_1_chunk = 100000
         if tailSize <= max_tailsize_in_1_chunk:
             self.splits = 1
@@ -48,10 +46,9 @@ class libmr:
             to_return = self._weibullFilltingInBatches(data, tailSize, isSorted, gpu)
         return to_return
 
-    def FitHigh(self, data, tailSize, isSorted=False, gpu=0, isReversed=False):
+    def FitHigh(self, data, tailSize, isSorted=False, gpu=0):
         self.sign = 1
         self.splits = 1
-        self.reversed = isReversed
         return self._weibullFitting(data, tailSize, isSorted, gpu)
 
     def compute_weibull_object(self, distances):
@@ -78,7 +75,7 @@ class libmr:
         distances = distances.clamp(min=0)
         return weibulls, distances
 
-    def wscore(self, distances):
+    def wscore(self, distances, isReversed=False):
         """
         This function can calculate scores from various weibulls for a given set of distances
         :param distances: a 2-D tensor with the number of rows equal to number of samples and number of columns equal to number of weibulls
@@ -87,7 +84,7 @@ class libmr:
         :return:
         """
         weibulls, distances = self.compute_weibull_object(distances)
-        if self.reversed:
+        if isReversed:
             return 1 - weibulls.cdf(distances)
         else:
             return weibulls.cdf(distances)
