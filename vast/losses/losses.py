@@ -145,8 +145,7 @@ class objectoSphere_loss:
         self.batch_size = batch_size
 
     def __call__(self, features, target, sample_weights=None):
-        features_ = features.detach()
-        mag = features_.norm(p=2, dim=1)
+        mag = features.norm(p=2, dim=1)
         if features.shape[0] != self.batch_size:
             self.knownsMinimumMag_tensor = (
                 tools.device(torch.ones(features.shape[0])) * self.knownsMinimumMag
