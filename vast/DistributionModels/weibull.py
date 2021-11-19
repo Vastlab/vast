@@ -23,5 +23,6 @@ class weibull(libmrTorch):
         a 1-D tensor with number of elements equal to number of test samples
         :return:
         """
+        print("The pdf method is experimental and its functionality is not officially confirmed yet")
         weibulls, distances = self.compute_weibull_object(distances)
         return torch.exp(weibulls.log_prob(distances))
