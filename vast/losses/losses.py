@@ -1,6 +1,6 @@
 import torch
 from torch.nn import functional as F
-from vast import tools
+from .. import tools
 
 """
 For usage consult https://github.com/Vastlab/MNIST_Experiments/blob/master/MNIST_SoftMax_Training.py
