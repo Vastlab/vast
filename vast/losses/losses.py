@@ -1,6 +1,5 @@
 import torch
 from torch.nn import functional as F
-
 from .. import tools
 
 """
@@ -143,21 +142,18 @@ class objectoSphere_loss:
         self.knownsMinimumMag_tensor = (
             tools.device(torch.ones(batch_size)) * self.knownsMinimumMag
         )
-        self.zeros = tools.device(torch.zeros(batch_size))
         self.batch_size = batch_size
 
     def __call__(self, features, target, sample_weights=None):
-        features_ = features.detach()
-        mag = features_.norm(p=2, dim=1)
+        mag = features.norm(p=2, dim=1)
         if features.shape[0] != self.batch_size:
             self.knownsMinimumMag_tensor = (
                 tools.device(torch.ones(features.shape[0])) * self.knownsMinimumMag
             )
-            self.zeros = tools.device(torch.zeros(features.shape[0]))
             self.batch_size = features.shape[0]
         # For knowns magnitude minus \beta is loss
         mag_diff_from_ring = torch.clamp(self.knownsMinimumMag_tensor - mag, min=0.0)
-        loss = self.zeros
+        loss = tools.device(torch.zeros(self.batch_size))
         known_indexes = target != -1
         unknown_indexes = ~known_indexes
         loss[known_indexes] = mag_diff_from_ring[known_indexes]
