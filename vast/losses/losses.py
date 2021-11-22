@@ -137,30 +137,27 @@ class entropic_openset_loss:
 
 
 class objectoSphere_loss:
-    def __init__(self, batch_size, knownsMinimumMag=50.0):
+    def __init__(self, batch_size = None, knownsMinimumMag=50.0): # batchsize ignored for backward compatibility
         self.knownsMinimumMag = knownsMinimumMag
-        self.knownsMinimumMag_tensor = (
-            tools.device(torch.ones(batch_size)) * self.knownsMinimumMag
-        )
-        self.batch_size = batch_size
 
     def __call__(self, features, target, sample_weights=None):
+        # compute feature magnitude
         mag = features.norm(p=2, dim=1)
-        if features.shape[0] != self.batch_size:
-            self.knownsMinimumMag_tensor = (
-                tools.device(torch.ones(features.shape[0])) * self.knownsMinimumMag
-            )
-            self.batch_size = features.shape[0]
-        # For knowns magnitude minus \beta is loss
-        mag_diff_from_ring = torch.clamp(self.knownsMinimumMag_tensor - mag, min=0.0)
-        loss = tools.device(torch.zeros(self.batch_size))
+        # For knowns we want a certain magnitude
+        mag_diff_from_ring = torch.clamp(self.knownsMinimumMag - mag, min=0.0)
+
+        # Loss per sample
+        loss = tools.device(torch.zeros(features.shape[0]))
         known_indexes = target != -1
         unknown_indexes = ~known_indexes
+        # knowns: punish if magnitude is inside of ring
         loss[known_indexes] = mag_diff_from_ring[known_indexes]
+        # unknowns: punish any magnitude
         loss[unknown_indexes] = mag[unknown_indexes]
         loss = torch.pow(loss, 2)
         if sample_weights is not None:
             loss = sample_weights * loss
+        # todo: return average loss
         return loss
 
 
