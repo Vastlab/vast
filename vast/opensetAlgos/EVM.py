@@ -12,6 +12,7 @@ Author: Akshay Raj Dhamija
   publisher={IEEE}
 }
 """
+import warnings
 import torch
 import itertools
 from ..tools import pairwisedistances
@@ -244,11 +245,14 @@ def EVM_Training(
         )
         # check if distances to self is zero
         e = torch.eye(positive_distances.shape[0]).type(torch.BoolTensor)
-        assert torch.allclose(
+        if not torch.allclose(
             positive_distances[e].type(torch.FloatTensor),
             torch.zeros(positive_distances.shape[0]),
-            atol=1e-06,
-        ), "Distances of samples to themselves is not zero. This may be due to a precision issue, try increasing the atol value from 1e-06 to 1e-05."
+            atol=1e-05,
+        ):
+            warnings.warn(
+                "Distances of samples to themselves is not zero. This may be due to a precision issue or something might be wrong with you distance function."
+            )
 
         for distance_multiplier, cover_threshold, org_tailsize in itertools.product(
             args.distance_multiplier, args.cover_threshold, args.tailsize
