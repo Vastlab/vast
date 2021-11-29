@@ -36,6 +36,7 @@ class center_loss:
             # Step 6 from Algorithm 1
             self.centers[cls_no] = self.centers[cls_no] + (self.beta * delta_c)
 
+    @tools.loss_reducer
     def __call__(self, FV, true_label):
         # Equation (2) from paper
         loss = torch.zeros(FV.shape[0]).to(FV.device)
@@ -44,7 +45,7 @@ class center_loss:
                 FV[true_label == cls_no],
                 self.centers[cls_no].expand_as(FV[true_label == cls_no]).to(FV.device),
             )
-        return torch.mean(loss)
+        return loss
 
 
 class tensor_center_loss:
@@ -78,6 +79,7 @@ class tensor_center_loss:
                 deltas[true_label == cls_no], dim=0
             )
 
+    @tools.loss_reducer
     def __call__(self, FV, true_label):
         # Equation (2) from paper
         loss = self.euclidean_dist_obj(FV, self.centers[true_label, :].to(FV.device))
@@ -118,6 +120,7 @@ class entropic_openset_loss:
         self.ones = tools.device(torch.ones(self.num_of_classes))
         self.unknowns_multiplier = 1.0 / self.num_of_classes
 
+    @tools.loss_reducer
     def __call__(self, logit_values, target, sample_weights=None):
         catagorical_targets = tools.device(torch.zeros(logit_values.shape))
         known_indexes = target != -1
@@ -137,9 +140,10 @@ class entropic_openset_loss:
 
 
 class objectoSphere_loss:
-    def __init__(self, batch_size = None, knownsMinimumMag=50.0): # batchsize ignored for backward compatibility
+    def __init__(self, knownsMinimumMag=50.0):
         self.knownsMinimumMag = knownsMinimumMag
 
+    @tools.loss_reducer
     def __call__(self, features, target, sample_weights=None):
         # compute feature magnitude
         mag = features.norm(p=2, dim=1)
@@ -161,6 +165,7 @@ class objectoSphere_loss:
         return loss
 
 
+@tools.loss_reducer
 def nll_loss(logit_values, target):
     log_values = F.log_softmax(logit_values, dim=1)
     negative_log_values = -1 * log_values
@@ -169,10 +174,11 @@ def nll_loss(logit_values, target):
     return sample_loss
 
 
+@tools.loss_reducer
 def org_sigmoid(logit_values, target, sample_weights):
     """
     Reimplementation of original sigmoid loss
     """
     loss = torch._C._nn.binary_cross_entropy(torch.sigmoid(logit_values), target)
     loss = torch.mean(loss * sample_weights, dim=1)
-    return torch.mean(loss)
+    return loss
