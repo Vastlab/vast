@@ -161,7 +161,6 @@ class objectoSphere_loss:
         loss = torch.pow(loss, 2)
         if sample_weights is not None:
             loss = sample_weights * loss
-        # todo: return average loss
         return loss
 
 
