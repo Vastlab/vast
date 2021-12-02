@@ -1,5 +1,5 @@
 import torch
-from vast.tools import device, set_device_cpu
+from ..tools import device, set_device_cpu
 
 set_device_cpu()
 

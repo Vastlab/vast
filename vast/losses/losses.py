@@ -36,6 +36,7 @@ class center_loss:
             # Step 6 from Algorithm 1
             self.centers[cls_no] = self.centers[cls_no] + (self.beta * delta_c)
 
+    @tools.loss_reducer
     def __call__(self, FV, true_label):
         # Equation (2) from paper
         loss = torch.zeros(FV.shape[0]).to(FV.device)
@@ -44,7 +45,7 @@ class center_loss:
                 FV[true_label == cls_no],
                 self.centers[cls_no].expand_as(FV[true_label == cls_no]).to(FV.device),
             )
-        return torch.mean(loss)
+        return loss
 
 
 class tensor_center_loss:
@@ -78,6 +79,7 @@ class tensor_center_loss:
                 deltas[true_label == cls_no], dim=0
             )
 
+    @tools.loss_reducer
     def __call__(self, FV, true_label):
         # Equation (2) from paper
         loss = self.euclidean_dist_obj(FV, self.centers[true_label, :].to(FV.device))
@@ -118,6 +120,7 @@ class entropic_openset_loss:
         self.ones = tools.device(torch.ones(self.num_of_classes))
         self.unknowns_multiplier = 1.0 / self.num_of_classes
 
+    @tools.loss_reducer
     def __call__(self, logit_values, target, sample_weights=None):
         catagorical_targets = tools.device(torch.zeros(logit_values.shape))
         known_indexes = target != -1
@@ -137,26 +140,23 @@ class entropic_openset_loss:
 
 
 class objectoSphere_loss:
-    def __init__(self, batch_size, knownsMinimumMag=50.0):
+    def __init__(self, knownsMinimumMag=50.0):
         self.knownsMinimumMag = knownsMinimumMag
-        self.knownsMinimumMag_tensor = (
-            tools.device(torch.ones(batch_size)) * self.knownsMinimumMag
-        )
-        self.batch_size = batch_size
 
+    @tools.loss_reducer
     def __call__(self, features, target, sample_weights=None):
+        # compute feature magnitude
         mag = features.norm(p=2, dim=1)
-        if features.shape[0] != self.batch_size:
-            self.knownsMinimumMag_tensor = (
-                tools.device(torch.ones(features.shape[0])) * self.knownsMinimumMag
-            )
-            self.batch_size = features.shape[0]
-        # For knowns magnitude minus \beta is loss
-        mag_diff_from_ring = torch.clamp(self.knownsMinimumMag_tensor - mag, min=0.0)
-        loss = tools.device(torch.zeros(self.batch_size))
+        # For knowns we want a certain magnitude
+        mag_diff_from_ring = torch.clamp(self.knownsMinimumMag - mag, min=0.0)
+
+        # Loss per sample
+        loss = tools.device(torch.zeros(features.shape[0]))
         known_indexes = target != -1
         unknown_indexes = ~known_indexes
+        # knowns: punish if magnitude is inside of ring
         loss[known_indexes] = mag_diff_from_ring[known_indexes]
+        # unknowns: punish any magnitude
         loss[unknown_indexes] = mag[unknown_indexes]
         loss = torch.pow(loss, 2)
         if sample_weights is not None:
@@ -164,6 +164,7 @@ class objectoSphere_loss:
         return loss
 
 
+@tools.loss_reducer
 def nll_loss(logit_values, target):
     log_values = F.log_softmax(logit_values, dim=1)
     negative_log_values = -1 * log_values
@@ -172,10 +173,11 @@ def nll_loss(logit_values, target):
     return sample_loss
 
 
+@tools.loss_reducer
 def org_sigmoid(logit_values, target, sample_weights):
     """
     Reimplementation of original sigmoid loss
     """
     loss = torch._C._nn.binary_cross_entropy(torch.sigmoid(logit_values), target)
     loss = torch.mean(loss * sample_weights, dim=1)
-    return torch.mean(loss)
+    return loss
