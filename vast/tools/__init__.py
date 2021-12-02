@@ -20,4 +20,11 @@ def device(x):
 
 def set_device_cpu():
     global _device
-    _device = "cpu"
+    import torch
+    _device = torch.device("cpu")
+
+
+def set_device_gpu(index=0):
+    global _device
+    import torch
+    _device = torch.device(f"cuda:{index}"}
