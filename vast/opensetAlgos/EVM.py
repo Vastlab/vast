@@ -263,16 +263,29 @@ def EVM_Training(
                 tailsize = int(org_tailsize)
             # Perform actual EVM training
             weibull_model = fit_low(bottom_k_distances, distance_multiplier, tailsize, gpu)
-            extreme_vectors_models, extreme_vectors_indexes, covered_vectors = set_cover(
-                weibull_model, positive_distances.to(device), cover_threshold
-            )
-            extreme_vectors = torch.gather(
-                positive_cls_feature,
-                0,
-                extreme_vectors_indexes[:, None]
-                .to(device)
-                .repeat(1, positive_cls_feature.shape[1]),
-            )
+            # If cover_threshold is greater than 1.0 then do not run set cover rather
+            # just consider all samples as extreme vector indices. This is what set cover will do even if it is run.
+            if cover_threshold <= 1.0:
+                (
+                    extreme_vectors_models,
+                    extreme_vectors_indexes,
+                    covered_vectors,
+                ) = set_cover(
+                    weibull_model, positive_distances.to(device), cover_threshold
+                )
+                extreme_vectors = torch.gather(
+                    positive_cls_feature,
+                    0,
+                    extreme_vectors_indexes[:, None]
+                    .to(device)
+                    .repeat(1, positive_cls_feature.shape[1]),
+                )
+            else:
+                (
+                    extreme_vectors_models,
+                    extreme_vectors_indexes,
+                ) = weibull_model, torch.arange(positive_cls_feature.shape[0])
+                extreme_vectors = positive_cls_feature
             extreme_vectors_models.tocpu()
             extreme_vectors = extreme_vectors.cpu()
             yield (
