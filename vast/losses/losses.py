@@ -133,7 +133,7 @@ class entropic_openset_loss:
         log_values = F.log_softmax(logit_values, dim=1)
         negative_log_values = -1 * log_values
         loss = negative_log_values * catagorical_targets
-        sample_loss = torch.mean(loss, dim=1)
+        sample_loss = torch.sum(loss, dim=1)
         if sample_weights is not None:
             sample_loss = sample_loss * sample_weights
         return sample_loss
