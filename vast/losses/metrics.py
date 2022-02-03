@@ -87,7 +87,6 @@ def confidence(logits, target, negative_offset=0.1):
         known = target >= 0
 
         pred = torch.nn.functional.softmax(logits, dim=1)
-        #    import ipdb; ipdb.set_trace()
 
         confidence = 0.0
         if torch.sum(known):
@@ -98,3 +97,92 @@ def confidence(logits, target, negative_offset=0.1):
             )
 
     return torch.tensor((confidence, len(logits)))
+
+
+def split_confidence(logits, target, negative_offset = 0., unknown_class=-1):
+    """Measures the softmax confidence of the correct class for known samples and for unknown samples:
+
+    * with unknown_class = -1: 1 + negative_offset - max(confidence)
+    * with unknown_class =  C: 1 - max(confidence[:C]) for unknown samples
+
+    Parameters:
+
+        logits: the output of the network, must be logits
+
+        target: the vector of true classes; can be -1 for unknown samples
+
+        negative_offset: the value to be added to the unknown confidence to turn the maximum to one, usually 1/C with C being the number of classes
+
+        unknown_class: The class index that should be considered the unknown class; can be -1 or C
+
+    Returns a tuple with four entries:
+
+        known_confidence: the sum of the confidence values for the known samples
+
+        unknown_confidence: the sum of the confidence values for the unknown samples
+
+        known_samples: The total number of considered known samples in this batch
+
+        unknown_samples: The total number of considered unknown samples in this batch
+    """
+
+    with torch.no_grad():
+        known = target != unknown_class
+
+        pred = torch.nn.functional.softmax(logits, dim=1)
+
+        known_confidence = 0.
+        unknown_confidence = 0.
+        if torch.sum(known):
+            known_confidence = torch.sum(pred[known,target[known]])
+        if torch.sum(~known):
+            if unknown_class == -1:
+                unknown_confidence = torch.sum(1. + negative_offset - torch.max(pred[~known], dim=1)[0])
+            else:
+                unknown_confidence = torch.sum(1. - torch.max(pred[~known, :unknown_class], dim=1)[0])
+
+    return known_confidence, unknown_confidence, torch.sum(known), torch.sum(~known)
+
+
+
+def auc_split(logits, target, unknown_class=-1):
+    """Computes the scores such that they later can be used to compute an ROC curve.
+    After collecting data from all samples, you can call ``sklearn.metrics.roc_auc_score(scores, labels)`` to determine the quality of your current network (larger values are better).
+
+    The scores for the known class will be softmax output for the corresponding class.
+    The scores for the unknown class will be the maximum softmax output over all known classes.
+
+    Parameters:
+
+        logits: the output of the network, must be logits
+
+        target: the vector of true classes; can be -1 for unknown samples
+
+        unknown_class: The class index that should be considered the unknown class; can be -1 or C
+
+    Returns:
+
+        scores: A list of scores for the samples.
+
+        labels: A list of binary labels (known/unknown) for the samples.
+    """
+
+    with torch.no_grad():
+        known = target == unknown_class
+        unknown = ~known
+        last = unknown_class if unknown_class >= 0 else None
+
+        pred = torch.nn.functional.softmax(logits, dim=1)
+
+        scores = torch.empty(len(target))
+        labels = torch.empty(len(target))
+
+        if torch.sum(known):
+            scores[known] = pred[known, target[known]]
+            labels[known] = 1
+
+        if torch.sum(unknown):
+            scores[unknown] = torch.max(pred[unknown, :last], dim=1)
+            labels[unknown] = -1
+
+    return scores.tolist(), labels.tolist()
