@@ -196,7 +196,8 @@ def EVM_Training(
         positive_cls_feature = features_all_classes[pos_cls_name].to(device)
         tailsize = max(args.tailsize)
         if tailsize <= 1:
-            tailsize = tailsize * positive_cls_feature.shape[0]
+            neg_count = sum(n.shape[0] for c,n in features_all_classes.items() if c != pos_cls_name)
+            tailsize = tailsize * neg_count
         tailsize = int(tailsize)
 
         negative_classes_for_current_class = []
@@ -258,14 +259,15 @@ def EVM_Training(
             args.distance_multiplier, args.cover_threshold, args.tailsize
         ):
             if org_tailsize <= 1:
-                tailsize = int(org_tailsize * positive_cls_feature.shape[0])
+                neg_count = sum(n.shape[0] for c,n in features_all_classes.items() if c != pos_cls_name)
+                tailsize = int(org_tailsize * neg_count)
             else:
                 tailsize = int(org_tailsize)
             # Perform actual EVM training
             weibull_model = fit_low(bottom_k_distances, distance_multiplier, tailsize, gpu)
             # If cover_threshold is greater than 1.0 then do not run set cover rather
             # just consider all samples as extreme vector indices. This is what set cover will do even if it is run.
-            if cover_threshold <= 1.0:
+            if cover_threshold < 1.0:
                 (
                     extreme_vectors_models,
                     extreme_vectors_indexes,
