@@ -170,8 +170,8 @@ class maximal_entropy_loss(torch.nn.Module):
         Paper: Open-set Face Recognition with Neural Ensemble, Feature Augmentation and Maximal Entropy Loss
         Authors: Rafael Henrique Vareto, William Schwartz, Manuel Günther
     '''
-    def __init__(self, margin=0.50, num_of_classes=2):
-        super(MaximalEntropyLoss, self).__init__()
+    def __init__(self, margin=0.50, num_of_classes=10):
+        super(maximal_entropy_loss, self).__init__()
         self.margin = margin
         self.num_of_classes = num_of_classes
         self.eye = torch.eye(self.num_of_classes)
