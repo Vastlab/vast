@@ -164,6 +164,41 @@ class objectoSphere_loss:
         return loss
 
 
+class maximal_entropy_loss(torch.nn.Module):
+    '''
+    Maximal Entropy Loss
+        Paper: Open-set Face Recognition with Neural Ensemble, Feature Augmentation and Maximal Entropy Loss
+        Authors: Rafael Henrique Vareto, William Schwartz, Manuel Günther
+    '''
+    def __init__(self, margin=0.50, num_of_classes=2):
+        super(MaximalEntropyLoss, self).__init__()
+        self.margin = margin
+        self.num_of_classes = num_of_classes
+        self.eye = torch.eye(self.num_of_classes)
+        self.ones = torch.ones(self.num_of_classes)
+        self.unknowns_multiplier = 1.0 / self.num_of_classes
+
+    def forward(self, logits, targets, sample_weights=None):
+        categorical_targets = torch.zeros(logits.shape)
+        margin_logits = torch.zeros(logits.shape)
+        backg_indexes = (targets  < 0)
+        known_indexes = (targets >= 0)
+        categorical_targets[known_indexes, :] = self.eye[targets[known_indexes]]
+        target_logits = logits - self.margin
+        margin_logits[known_indexes] = logits[known_indexes] * (1 - self.eye[targets[known_indexes]]) + target_logits[known_indexes] * self.eye[targets[known_indexes]]
+        margin_logits[backg_indexes] = logits[backg_indexes]
+        categorical_targets[backg_indexes, :] = (
+            self.ones.expand(backg_indexes.count_nonzero().item(), self.num_of_classes) *
+            self.unknowns_multiplier
+        )
+        negative_log_values = (-1) * torch.nn.functional.log_softmax(margin_logits, dim=1)
+        loss = negative_log_values.cpu() * categorical_targets
+        loss = torch.sum(loss, dim=1)
+        if sample_weights is not None:
+            loss = loss * sample_weights
+        return loss
+
+
 @tools.loss_reducer
 def nll_loss(logit_values, target):
     log_values = F.log_softmax(logit_values, dim=1)
