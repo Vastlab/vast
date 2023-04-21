@@ -53,10 +53,10 @@ class LeNet_plus_plus(nn.Module):
         if use_classification_layer:
             if use_BG:
                 self.fc2 = nn.Linear(
-                    in_features=2, out_features=num_classes + 1, bias=True
+                    in_features=2, out_features=num_classes + 1, bias=False
                 )
             else:
-                self.fc2 = nn.Linear(in_features=2, out_features=num_classes, bias=True)
+                self.fc2 = nn.Linear(in_features=2, out_features=num_classes, bias=False)
         self.use_classification_layer = use_classification_layer
         self.prelu_act1 = nn.PReLU()
         self.prelu_act2 = nn.PReLU()
@@ -94,10 +94,10 @@ class LeNet(nn.Module):
         if use_classification_layer:
             if use_BG:
                 self.fc2 = nn.Linear(
-                    in_features=500, out_features=num_classes + 1, bias=True
+                    in_features=500, out_features=num_classes + 1, bias=False
                 )
             else:
-                self.fc2 = nn.Linear(in_features=500, out_features=num_classes, bias=True)
+                self.fc2 = nn.Linear(in_features=500, out_features=num_classes, bias=False)
         self.relu_act = nn.ReLU()
         self.use_classification_layer = use_classification_layer
         print(
