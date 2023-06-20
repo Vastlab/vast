@@ -3,7 +3,7 @@ import torchvision.models as models
 
 
 class LeNet_plus_plus(nn.Module):
-    def __init__(self, use_classification_layer=True, use_BG=False, num_classes=10):
+    def __init__(self, use_classification_layer=True, use_BG=False, num_classes=10, final_layer_bias=True):
         super(LeNet_plus_plus, self).__init__()
         self.conv1_1 = nn.Conv2d(
             in_channels=1, out_channels=32, kernel_size=(5, 5), stride=1, padding=2
@@ -53,10 +53,10 @@ class LeNet_plus_plus(nn.Module):
         if use_classification_layer:
             if use_BG:
                 self.fc2 = nn.Linear(
-                    in_features=2, out_features=num_classes + 1, bias=False
+                    in_features=2, out_features=num_classes + 1, bias=final_layer_bias
                 )
             else:
-                self.fc2 = nn.Linear(in_features=2, out_features=num_classes, bias=False)
+                self.fc2 = nn.Linear(in_features=2, out_features=num_classes, bias=final_layer_bias)
         self.use_classification_layer = use_classification_layer
         self.prelu_act1 = nn.PReLU()
         self.prelu_act2 = nn.PReLU()
@@ -75,7 +75,7 @@ class LeNet_plus_plus(nn.Module):
 
 
 class LeNet(nn.Module):
-    def __init__(self, use_classification_layer=True, use_BG=False, num_classes=10):
+    def __init__(self, use_classification_layer=True, use_BG=False, num_classes=10, final_layer_bias=True):
         super(LeNet, self).__init__()
         self.conv1 = nn.Conv2d(
             in_channels=1, out_channels=20, kernel_size=(5, 5), stride=1, padding=2
@@ -94,10 +94,10 @@ class LeNet(nn.Module):
         if use_classification_layer:
             if use_BG:
                 self.fc2 = nn.Linear(
-                    in_features=500, out_features=num_classes + 1, bias=False
+                    in_features=500, out_features=num_classes + 1, bias=final_layer_bias
                 )
             else:
-                self.fc2 = nn.Linear(in_features=500, out_features=num_classes, bias=False)
+                self.fc2 = nn.Linear(in_features=500, out_features=num_classes, bias=final_layer_bias)
         self.relu_act = nn.ReLU()
         self.use_classification_layer = use_classification_layer
         print(
