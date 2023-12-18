@@ -52,7 +52,7 @@ computation may have slight variations.
 3. Precision/Recall for binary class OOD problem
 4. F-ß Score
 
-
+Unless a module has a separate license, this code is free for non-commercial use.  We only ask that you cite one our papers, which everyone is most apprpiriate:
 
 
 ## Examples
